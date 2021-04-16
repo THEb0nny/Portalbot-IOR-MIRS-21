@@ -40,17 +40,18 @@ AccelStepper stepperY(AccelStepper::DRIVER, STEPPER_Y_STP_PIN, STEPPER_Y_DIR_PIN
 
 GTimer_ms myTimer1(100);
 
-const String needSolve[3][3] = {
+// Как нужно скомплектовать коробку 
+const String boxCompleteSolve[3][3] = {
   {"RC", "BC", "GC"},
   {"RCC", "BCC", "GCC"},
   {"RB", "BB", "GB"}
 }; // RC - красный куб, RCC - красный куб с выемкой, RB - красный шар
 
 // Переменые для хранения фигор на старте
-String topPos[3] = {"N", "N", "N"};
-String bottomPos[3] = {"N", "N", "N"};
-String leftPos[3] = {"N", "N", "N"};
-String rightPos[3] = {"N", "N", "N"};
+String tStorage[3] = {"N", "N", "N"};
+String bStorage[3] = {"N", "N", "N"};
+String lStorage[3] = {"N", "N", "N"};
+String rStorage[3] = {"N", "N", "N"};
 
 // ИНФА
 //http://forum.amperka.ru/threads/%D0%91%D0%B8%D0%B1%D0%BB%D0%B8%D0%BE%D1%82%D0%B5%D0%BA%D0%B0-accelstepper.11388/
@@ -73,7 +74,6 @@ void loop() {
     //int flag1 = !xStartlimitSwitch.dpRead1(); //xStartlimitSwitch.dpRead2(); x2limitSwitchB.touched();
     //int flag = xStartlimitSwitch.touched();
     //Serial.print(flag);
-    
   }
   while (!xStartlimitSwitch.touched()) {
     Serial.println("work");
@@ -86,6 +86,16 @@ void loop() {
     stepperX.runSpeed();
   }
   Serial.println();
+}
+
+// Управление из Serial
+void manualСontrol() {
+  while (true) {
+    String command = Serial.readStringUntil('\n'); // Считываем из Serial строку до символа переноса на новую строку
+    if (Serial.available() > 0) {  // Если есть доступные данные
+      int ledR = command.substring(1).toInt();
+    }
+  }
 }
 
 void moveCoreXY(int x, int y) {
