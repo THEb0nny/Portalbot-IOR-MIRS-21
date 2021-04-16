@@ -18,9 +18,10 @@
 #define STEPPER_Y_DIR_PIN mePort[PORT_2].s1
 #define STEPPER_Y_STP_PIN mePort[PORT_2].s2
 
-#define STEPPERS_MAX_SPEED 1000
-#define STEPPERS_ACCEL 20000
-#define DEG_PER_STAPE 0.45
+#define STEPPERS_MAX_SPEED 1000 // Максимальная скорость
+#define STEPPERS_ACCEL 20000 // Ускорение
+#define DEG_PER_STEP 0.45 // Градусы за шаг
+#define STEP_TO_ROTATION 800 // Шагов за оборот
 
 AccelStepper stepperX(AccelStepper::DRIVER, STEPPER_X_DIR_PIN, STEPPER_X_STP_PIN);
 AccelStepper stepperY(AccelStepper::DRIVER, STEPPER_Y_DIR_PIN, STEPPER_Y_STP_PIN);
