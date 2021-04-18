@@ -93,14 +93,23 @@ void loop() {
 void manualСontrol() {
   while (true) {
     String command = Serial.readStringUntil('\n'); // Считываем из Serial строку до символа переноса на новую строку
+    command.trim();
     if (Serial.available() > 0) {  // Если есть доступные данные
       int ledR = command.substring(1).toInt();
     }
   }
 }
 
-void moveCoreXY(int x, int y) {
-  
+void FK_CoreXY(long l1, long l2, float &x, float &y) {
+  l1 *= THREADPERSTEP1;
+  l2 *= THREADPERSTEP2;
+  x = (float)(l1 + l2) / 2.0;
+  y = x – (float)l2;
+}
+
+void IK_CoreXY(float x, float y, long &l1, long &l2) {
+  l1 = floor((x + y) / THREADPERSTEP1);
+  l2 = floor((x - y) / THREADPERSTEP2);
 }
 
 void moveToolZ() {
