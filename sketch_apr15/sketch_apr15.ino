@@ -58,6 +58,7 @@ String rStorage[3] = {"N", "N", "N"};
 //http://www.airspayce.com/mikem/arduino/AccelStepper/index.html
 //http://learn.makeblock.com/Makeblock-library-for-Arduino/class_me_port.html
 //http://learn.makeblock.com/en/Makeblock-library-for-Arduino/class_me_limit_switch.html
+//https://www.marginallyclever.com/2015/01/adapting-makelangelo-corexy-kinematics/
 
 void setup() {
   Serial.begin(9600);
