@@ -5,24 +5,24 @@
 #include <math.h>
 #include "GyverTimer.h"
 
-#define LIMIT_SWITCH_X_START_PORT PORT_3 // Ближние концевики к моторам
-#define LIMIT_SWITCH_X_START_SLOT SLOT_1 // Ближние концевики к моторам
+#define LIMIT_SWITCH_X_START_PORT PORT_3 // Порт ближних концевиков к моторам
+#define LIMIT_SWITCH_X_START_SLOT SLOT_1 // Слот ближних концевиков к моторам
 
-#define LIMIT_SWITCH_X_END_PORT 0 // Дальние концевики от моторов
-#define LIMIT_SWITCH_X_END_SLOT 0 // Дальние концевики от моторов
+#define LIMIT_SWITCH_X_END_PORT 0 // Порт дальних концевиков от моторов
+#define LIMIT_SWITCH_X_END_SLOT 0 // Слот дальних концевиков от моторов
 
-#define LIMIT_SWITCH_Y_START_PORT 0 // Концевик для коретки со стороны мотора X
-#define LIMIT_SWITCH_Y_START_SLOT 0 // Концевик для коретки со стороны мотора X
+#define LIMIT_SWITCH_Y_START_PORT 0 // Порт концевика для коретки со стороны мотора X
+#define LIMIT_SWITCH_Y_START_SLOT 0 // Слот концевика для коретки со стороны мотора X
 
-#define LIMIT_SWITCH_Y_END_PORT 0 // Концевик для коретки со стороны мотора Y
-#define LIMIT_SWITCH_Y_END_SLOT 0 // Концевик для коретки со стороны мотора Y
+#define LIMIT_SWITCH_Y_END_PORT 0 // Порт концевика для коретки со стороны мотора Y
+#define LIMIT_SWITCH_Y_END_SLOT 0 // Слот концевика для коретки со стороны мотора Y
 
 MeLimitSwitch xStartlimitSwitch(LIMIT_SWITCH_X_START_PORT, LIMIT_SWITCH_X_START_SLOT); // Не работает концевик на 8, 7 в слоте 1
 //MePort xStartlimitSwitch(LIMIT_SWITCH_X_START);
 
 // Серво инструмента
-#define SERVO_Z 0 // Серво для перемещения по Z инструмента
-#define SERVO_Z2 0 // Дополнительный серво по Z у инструмента
+#define SERVO_Z_PIN 0 // Серво для перемещения по Z инструмента
+#define SERVO_Z2_PIN 0 // Дополнительный серво по Z у инструмента
 
 // Шаговые двигатели X, Y
 #define STEPPER_X_DIR_PIN mePort[PORT_1].s1
@@ -58,6 +58,7 @@ String rStorage[3] = {"N", "N", "N"};
 //http://www.airspayce.com/mikem/arduino/AccelStepper/index.html
 //http://learn.makeblock.com/Makeblock-library-for-Arduino/class_me_port.html
 //http://learn.makeblock.com/en/Makeblock-library-for-Arduino/class_me_limit_switch.html
+//https://www.marginallyclever.com/2015/01/adapting-makelangelo-corexy-kinematics/
 
 void setup() {
   Serial.begin(9600);
@@ -88,18 +89,46 @@ void loop() {
   Serial.println();
 }
 
+#define THREADPERSTEP1 1
+#define THREADPERSTEP2 1
+
 // Управление из Serial
-void manualСontrol() {
+void manualControl() {
   while (true) {
     String command = Serial.readStringUntil('\n'); // Считываем из Serial строку до символа переноса на новую строку
-    if (Serial.available() > 0) {  // Если есть доступные данные
-      int ledR = command.substring(1).toInt();
+    command.trim(); // Чистим символы
+    if (Serial.available() > 0) { // Если есть доступные данные
+      // Считываем x и y разделённых пробелом
+      float xVal = getValue(command, " ", 0).toFloat();
+      float yVal = getValue(command, " ", 1).toFloat();
     }
   }
 }
 
-void moveCoreXY(int x, int y) {
-  
+String getValue(String data, char separator, int index) {
+    int found = 0;
+    int strIndex[] = { 0, -1 };
+    int maxIndex = data.length() - 1;
+    for (int i = 0; i <= maxIndex && found <= index; i++) {
+        if (data.charAt(i) == separator || i == maxIndex) {
+            found++;
+            strIndex[0] = strIndex[1] + 1;
+            strIndex[1] = (i == maxIndex) ? i+1 : i;
+        }
+    }
+    return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
+}
+
+void FK_CoreXY(long lx, long lx, float &x, float &y) { // void FK_CoreXY(long l1, long l2, float &x, float &y)
+  lx *= THREADPERSTEP1;
+  ly *= THREADPERSTEP2;
+  x = (float)(lx + ly) / 2.0;
+  y = x - (float)ly;
+}
+
+void IK_CoreXY(float x, float y, long &lx, long &ly) { // void IK_CoreXY(float x, float y, long &l1, long &l2)
+  lx = floor((x + y) / THREADPERSTEP1);
+  ly = floor((x - y) / THREADPERSTEP2);
 }
 
 void moveToolZ() {
