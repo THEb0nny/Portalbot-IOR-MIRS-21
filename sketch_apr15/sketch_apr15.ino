@@ -2,7 +2,7 @@
 #include <Arduino.h>
 #include <MeOrion.h>
 #include <AccelStepper.h>
-#include <Servo.h>
+//#include <Servo.h>
 #include <math.h>
 #include "GyverTimer.h"
 
@@ -12,20 +12,22 @@
 #define LIMIT_SWITCH_X_END_PORT 0 // Порт дальних концевиков от моторов
 #define LIMIT_SWITCH_X_END_SLOT 0 // Слот дальних концевиков от моторов
 
-#define LIMIT_SWITCH_Y_START_PORT 0 // Порт концевика для коретки со стороны мотора X
-#define LIMIT_SWITCH_Y_START_SLOT 0 // Слот концевика для коретки со стороны мотора X
+#define LIMIT_SWITCH_Y_START_PORT PORT_4 // Порт концевика для коретки со стороны мотора X
+#define LIMIT_SWITCH_Y_START_SLOT SLOT_1 // Слот концевика для коретки со стороны мотора X
 
 #define LIMIT_SWITCH_Y_END_PORT 0 // Порт концевика для коретки со стороны мотора Y
 #define LIMIT_SWITCH_Y_END_SLOT 0 // Слот концевика для коретки со стороны мотора Y
 
-MeLimitSwitch xStartlimitSwitch(LIMIT_SWITCH_X_START_PORT, LIMIT_SWITCH_X_START_SLOT); // Не работает концевик на 8, 7 в слоте 1
+// Не работает концевик на 8, 7 в слоте 1
+MeLimitSwitch xStartlimitSwitch(LIMIT_SWITCH_X_START_PORT, LIMIT_SWITCH_X_START_SLOT);
+MeLimitSwitch yStartlimitSwitch(LIMIT_SWITCH_Y_START_PORT, LIMIT_SWITCH_Y_START_SLOT);
 //MePort xStartlimitSwitch(LIMIT_SWITCH_X_START);
 
 // Серво инструмента
 #define SERVO_Z_PIN 0 // Серво для перемещения по Z инструмента
 #define SERVO_Z2_PIN 0 // Дополнительный серво по Z у инструмента
 
-Servo servoZ;
+//Servo servoZ;
 
 // Шаговые двигатели X, Y
 #define STEPPER_X_DIR_PIN mePort[PORT_1].s1
@@ -44,10 +46,10 @@ AccelStepper stepperY(AccelStepper::DRIVER, STEPPER_Y_STP_PIN, STEPPER_Y_DIR_PIN
 
 GTimer_ms myTimer1(10);
 
-#define CAM_SERIAL_RX 0;
-#define CAM_SERIAL_TX 0;
+#define CAM_SERIAL_RX 0
+#define CAM_SERIAL_TX 0
 
-Serial camSerial(CAM_SERIAL_RX, CAM_SERIAL_TX); // Сериал для общения с камерой 
+SoftwareSerial camSerial(CAM_SERIAL_RX, CAM_SERIAL_TX); // Сериал для общения с камерой 
 
 // Как нужно скомплектовать коробку 
 const String boxCompleteSolve[3][3] = {
@@ -75,7 +77,7 @@ void setup() {
   stepperX.setAcceleration(STEPPERS_ACCEL); // Установка ускорения, в шагах в секунду за секунду
   stepperY.setMaxSpeed(STEPPERS_MAX_SPEED);
   stepperY.setAcceleration(STEPPERS_ACCEL);
-  servoZ.attach(SERVO_Z_PIN);
+  //servoZ.attach(SERVO_Z_PIN);
 }
 
 void loop() {
@@ -86,21 +88,39 @@ void loop() {
     //int flag = xStartlimitSwitch.touched();
     //Serial.print(flag);
   }
-  while (!xStartlimitSwitch.touched()) {
-    Serial.println("work");
-    //stepperX.moveTo(800);
-    //stepperY.moveTo(-800);
-    //stepperX.run();
-    //stepperY.run();
-    stepperX.setSpeed(STEPPERS_MAX_SPEED);
-    //stepperY.setSpeed(100);
-    stepperX.runSpeed();
-  }
+  searchStartPos(); // Вернуться на базу и установить 0-е позиции
+  while(true) { delay(100); }
   Serial.println();
 }
 
+void searchStartPos() {
+  //stepperX.moveTo(800);
+  //stepperY.moveTo(-800);
+  //stepperX.run();
+  //stepperY.run();
+  //stepperX.setSpeed(STEPPERS_MAX_SPEED);
+  //stepperY.setSpeed(100);
+  while (!yStartlimitSwitch.touched()) { // По y сместиться в крайнюю позицию
+    stepperX.setSpeed(STEPPERS_MAX_SPEED);
+    stepperY.setSpeed(STEPPERS_MAX_SPEED);
+    stepperX.runSpeed();
+    stepperY.runSpeed();
+  }
+  while (!xStartlimitSwitch.touched()) { // По x сместиться в крайнюю позицию
+    stepperX.setSpeed(STEPPERS_MAX_SPEED);
+    stepperY.setSpeed(-STEPPERS_MAX_SPEED);
+    stepperX.runSpeed();
+    stepperY.runSpeed();
+  }
+  // Установить позиции 0, 0
+  stepperX.setCurrentPosition(0);
+  stepperY.setCurrentPosition(0);
+  Serial.println(stepperX.currentPosition());
+  Serial.println(stepperY.currentPosition());
+}
+
 // Управление из Serial
-void manualControl() {
+/*void manualControl() {
   while (true) {
     String command = Serial.readStringUntil('\n'); // Считываем из Serial строку до символа переноса на новую строку
     command.trim(); // Чистим символы
@@ -110,8 +130,8 @@ void manualControl() {
       float yVal = getValue(command, " ", 1).toFloat();
     }
   }
-}
-
+}*/
+/*
 String getValue(String data, char separator, int index) {
     int found = 0;
     int strIndex[] = { 0, -1 };
@@ -126,20 +146,20 @@ String getValue(String data, char separator, int index) {
     return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
 
-float x, y;
+float x, y, lx, ly;
 
-void FK_CoreXY(long lx, long lx, float &x, float &y) { // void FK_CoreXY(long l1, long l2, float &x, float &y)
-  lx *= DIST_MM_PER_STEP;
-  ly *= DIST_MM_PER_STEP;
-  x = (float)(lx + ly) / 2.0;
-  y = x - (float)ly;
+void FK_CoreXY(float lx, float ly) { // void FK_CoreXY(long l1, long l2, float &x, float &y)
+  //lx *= DIST_MM_PER_STEP;
+  //ly *= DIST_MM_PER_STEP;
+  //x = (float)(lx + ly) / 2.0;
+  //y = x - (float)ly;
 }
 
-void IK_CoreXY(float x, float y, long &lx, long &ly) { // void IK_CoreXY(float x, float y, long &l1, long &l2)
+void IK_CoreXY(float x, float y) { // void IK_CoreXY(float x, float y, long &l1, long &l2)
   lx = floor((x + y) / DIST_MM_PER_STEP);
   ly = floor((x - y) / DIST_MM_PER_STEP);
 }
 
 void moveToolZ() {
   
-}
+}*/
