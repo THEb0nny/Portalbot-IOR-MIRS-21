@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include <MeOrion.h>
 #include <AccelStepper.h>
+#include <Servo.h>
 #include <math.h>
 #include "GyverTimer.h"
 
@@ -24,6 +25,8 @@ MeLimitSwitch xStartlimitSwitch(LIMIT_SWITCH_X_START_PORT, LIMIT_SWITCH_X_START_
 #define SERVO_Z_PIN 0 // Серво для перемещения по Z инструмента
 #define SERVO_Z2_PIN 0 // Дополнительный серво по Z у инструмента
 
+Servo servoZ;
+
 // Шаговые двигатели X, Y
 #define STEPPER_X_DIR_PIN mePort[PORT_1].s1
 #define STEPPER_X_STP_PIN mePort[PORT_1].s2
@@ -32,13 +35,19 @@ MeLimitSwitch xStartlimitSwitch(LIMIT_SWITCH_X_START_PORT, LIMIT_SWITCH_X_START_
 
 #define STEPPERS_MAX_SPEED 5000 // Максимальная скорость
 #define STEPPERS_ACCEL 20000 // Ускорение
-#define DEG_PER_STEP 0.9 // Градусы за шаг
 #define STEP_TO_ROTATION 400 // Шагов за оборот
+#define DEG_PER_STEP 360 / STEP_TO_ROTATION // Градусы за шаг - 0.9
+#define DIST_MM_PER_STEP 0 // Дистанция в мм за прохождение 1 шага
 
 AccelStepper stepperX(AccelStepper::DRIVER, STEPPER_X_STP_PIN, STEPPER_X_DIR_PIN);
 AccelStepper stepperY(AccelStepper::DRIVER, STEPPER_Y_STP_PIN, STEPPER_Y_DIR_PIN);
 
-GTimer_ms myTimer1(100);
+GTimer_ms myTimer1(10);
+
+#define CAM_SERIAL_RX 0;
+#define CAM_SERIAL_TX 0;
+
+Serial camSerial(CAM_SERIAL_RX, CAM_SERIAL_TX); // Сериал для общения с камерой 
 
 // Как нужно скомплектовать коробку 
 const String boxCompleteSolve[3][3] = {
@@ -47,7 +56,7 @@ const String boxCompleteSolve[3][3] = {
   {"RB", "BB", "GB"}
 }; // RC - красный куб, RCC - красный куб с выемкой, RB - красный шар
 
-// Переменые для хранения фигор на старте
+// Переменые для хранения фигур после определения камерой
 String tStorage[3] = {"N", "N", "N"};
 String bStorage[3] = {"N", "N", "N"};
 String lStorage[3] = {"N", "N", "N"};
@@ -66,6 +75,7 @@ void setup() {
   stepperX.setAcceleration(STEPPERS_ACCEL); // Установка ускорения, в шагах в секунду за секунду
   stepperY.setMaxSpeed(STEPPERS_MAX_SPEED);
   stepperY.setAcceleration(STEPPERS_ACCEL);
+  servoZ.attach(SERVO_Z_PIN);
 }
 
 void loop() {
@@ -88,9 +98,6 @@ void loop() {
   }
   Serial.println();
 }
-
-#define THREADPERSTEP1 1
-#define THREADPERSTEP2 1
 
 // Управление из Serial
 void manualControl() {
@@ -119,16 +126,18 @@ String getValue(String data, char separator, int index) {
     return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
 
+float x, y;
+
 void FK_CoreXY(long lx, long lx, float &x, float &y) { // void FK_CoreXY(long l1, long l2, float &x, float &y)
-  lx *= THREADPERSTEP1;
-  ly *= THREADPERSTEP2;
+  lx *= DIST_MM_PER_STEP;
+  ly *= DIST_MM_PER_STEP;
   x = (float)(lx + ly) / 2.0;
   y = x - (float)ly;
 }
 
 void IK_CoreXY(float x, float y, long &lx, long &ly) { // void IK_CoreXY(float x, float y, long &l1, long &l2)
-  lx = floor((x + y) / THREADPERSTEP1);
-  ly = floor((x - y) / THREADPERSTEP2);
+  lx = floor((x + y) / DIST_MM_PER_STEP);
+  ly = floor((x - y) / DIST_MM_PER_STEP);
 }
 
 void moveToolZ() {
