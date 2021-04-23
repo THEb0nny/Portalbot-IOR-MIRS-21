@@ -36,10 +36,10 @@ MeLimitSwitch yStartlimitSwitch(LIMIT_SWITCH_Y_START_PORT, LIMIT_SWITCH_Y_START_
 #define STEPPER_Y_STP_PIN mePort[PORT_2].s2
 
 #define STEPPERS_MAX_SPEED 5000 // Максимальная скорость
-#define STEPPERS_ACCEL 20000 // Ускорение
+#define STEPPERS_ACCEL 15000 // Ускорение
 #define STEP_TO_ROTATION 400 // Шагов за оборот - 360 градусов
 #define DEG_PER_STEP 360 / STEP_TO_ROTATION // Градусы за шаг - 0.9
-#define DIST_MM_PER_STEP (1 / (PI * 4)) * STEP_TO_ROTATION // Дистанция в мм за прохождение 1 шага - 31.8471
+#define DIST_MM_PER_STEP 0.04 // Дистанция в мм за прохождение 1 шага // 0.0625
 
 AccelStepper stepperX(AccelStepper::DRIVER, STEPPER_X_STP_PIN, STEPPER_X_DIR_PIN);
 AccelStepper stepperY(AccelStepper::DRIVER, STEPPER_Y_STP_PIN, STEPPER_Y_DIR_PIN);
@@ -85,18 +85,17 @@ void loop() {
   manualControl(); // Ручное управление
   //mySolve();
   /*
-  while (stepperX.currentPosition() > -800) {
-    stepperX.moveTo(-800);
-    stepperX.run();
+  while (stepperY.currentPosition() < 100) {
+    stepperY.moveTo(100);
+    stepperY.run();
     Serial.println(stepperX.currentPosition());
   }
-  while (stepperX.currentPosition() < 800) {
-    stepperX.moveTo(800);
-    stepperX.run();
+  while (stepperX.currentPosition() < 100) {
+    stepperY.moveTo(100);
+    stepperY.run();
     Serial.println(stepperX.currentPosition());
-  }
+  }*/
   while(true) { delay(100); }
-  */
 }
 
 void mySolve() {
@@ -112,12 +111,6 @@ void mySolve() {
 }
 
 void searchStartPos() {
-  //stepperX.moveTo(800);
-  //stepperY.moveTo(-800);
-  //stepperX.run();
-  //stepperY.run();
-  //stepperX.setSpeed(STEPPERS_MAX_SPEED);
-  //stepperY.setSpeed(100);
   do {
     while (!yStartlimitSwitch.touched()) { // По y сместиться в крайнюю позицию
       stepperX.setSpeed(STEPPERS_MAX_SPEED);
@@ -150,9 +143,23 @@ void FK_CoreXY(float lx, float ly) { // void FK_CoreXY(long l1, long l2, float &
 }
 
 // Обратная задача кинематики
-void IK_CoreXY(float x, float y) { // void IK_CoreXY(float x, float y, long &l1, long &l2)
-  lx = floor((x + y) / DIST_MM_PER_STEP);
-  ly = floor((x - y) / DIST_MM_PER_STEP);
+int* IK_CoreXY(float x, float y) { // void IK_CoreXY(float x, float y, long &l1, long &l2)
+  lx = floor((x + y) / DIST_MM_PER_STEP) * -1;
+  ly = floor((x - y) / DIST_MM_PER_STEP) * -1;
+  int *new_array = new int[2];
+  new_array[0] = lx;
+  new_array[1] = ly;
+  return new_array;
+}
+
+// Обратная задача кинематики
+int* MyIK_CoreXY(float x, float y) { // void IK_CoreXY(float x, float y, long &l1, long &l2)
+  lx = floor(x / DIST_MM_PER_STEP) * -1;
+  ly = floor(x / DIST_MM_PER_STEP) * -1;
+  int *new_array = new int[2];
+  new_array[0] = lx;
+  new_array[1] = ly;
+  return new_array;
 }
 
 void moveToolZ() {
@@ -168,17 +175,20 @@ void manualControl() {
       char strBuffer[11] = {};
       command.toCharArray(strBuffer, 11);
       // Считываем x и y разделённых пробелом
-      float xVal = atoi(strtok(strBuffer, " "));
-      float yVal = atoi(strtok(NULL, " "));
+      int xVal = atoi(strtok(strBuffer, " "));
+      int yVal = atoi(strtok(NULL, " "));
       Serial.print("xVal: "); Serial.print(xVal); Serial.print(", "); Serial.print("yVal: "); Serial.println(yVal);
-      IK_CoreXY(xVal, yVal);
-      //Serial.print("x: "); Serial.print(x); Serial.print(", "); Serial.print("y: "); Serial.println(y);
-      /*while (true) {
+      int* pos = MyIK_CoreXY(xVal, yVal);
+      Serial.print("x: "); Serial.print(pos[0]); Serial.print(", "); Serial.print("y: "); Serial.println(pos[1]);
+      while (true) {
         stepperX.moveTo(lx);
         stepperY.moveTo(ly);
         stepperX.run();
         stepperY.run();
-      }*/
+        /*Serial.print(stepperX.currentPosition());
+        Serial.print(" ");
+        Serial.println(stepperY.currentPosition());*/
+      }
     }
   }
 }
