@@ -1,8 +1,8 @@
 #include <SoftwareSerial.h>
 #include <Arduino.h>
+//#include <Servo.h>
 #include <MeOrion.h>
 #include <AccelStepper.h>
-//#include <Servo.h>
 #include <math.h>
 #include "GyverTimer.h"
 
@@ -39,7 +39,7 @@ MeLimitSwitch yStartlimitSwitch(LIMIT_SWITCH_Y_START_PORT, LIMIT_SWITCH_Y_START_
 #define STEPPERS_ACCEL 20000 // Ускорение
 #define STEP_TO_ROTATION 400 // Шагов за оборот - 360 градусов
 #define DEG_PER_STEP 360 / STEP_TO_ROTATION // Градусы за шаг - 0.9
-#define DIST_MM_PER_STEP (1 / (PI * 4)) / STEP_TO_ROTATION // Дистанция в мм за прохождение 1 шага - 31.8471
+#define DIST_MM_PER_STEP (1 / (PI * 4)) * STEP_TO_ROTATION // Дистанция в мм за прохождение 1 шага - 31.8471
 
 AccelStepper stepperX(AccelStepper::DRIVER, STEPPER_X_STP_PIN, STEPPER_X_DIR_PIN);
 AccelStepper stepperY(AccelStepper::DRIVER, STEPPER_Y_STP_PIN, STEPPER_Y_DIR_PIN);
@@ -81,6 +81,25 @@ void setup() {
 }
 
 void loop() {
+  searchStartPos(); // Вернуться на базу и установить 0-е позиции
+  manualControl(); // Ручное управление
+  //mySolve();
+  /*
+  while (stepperX.currentPosition() > -800) {
+    stepperX.moveTo(-800);
+    stepperX.run();
+    Serial.println(stepperX.currentPosition());
+  }
+  while (stepperX.currentPosition() < 800) {
+    stepperX.moveTo(800);
+    stepperX.run();
+    Serial.println(stepperX.currentPosition());
+  }
+  while(true) { delay(100); }
+  */
+}
+
+void mySolve() {
   // Сдвинутся по X и Y в нулевую точку и по сигналу с концевика остановиться, обнулить позицию, зажечь свет
   // Получить данные с камеры
   if (myTimer1.isReady()) {
@@ -88,7 +107,6 @@ void loop() {
     //int flag = xStartlimitSwitch.touched();
     //Serial.print(flag);
   }
-  searchStartPos(); // Вернуться на базу и установить 0-е позиции
   while(true) { delay(100); } // Конец выполнения
   Serial.println();
 }
@@ -100,34 +118,38 @@ void searchStartPos() {
   //stepperY.run();
   //stepperX.setSpeed(STEPPERS_MAX_SPEED);
   //stepperY.setSpeed(100);
-  while (!yStartlimitSwitch.touched()) { // По y сместиться в крайнюю позицию
-    stepperX.setSpeed(STEPPERS_MAX_SPEED);
-    stepperY.setSpeed(STEPPERS_MAX_SPEED);
-    stepperX.runSpeed();
-    stepperY.runSpeed();
-  }
-  while (!xStartlimitSwitch.touched()) { // По x сместиться в крайнюю позицию
-    stepperX.setSpeed(STEPPERS_MAX_SPEED);
-    stepperY.setSpeed(-STEPPERS_MAX_SPEED);
-    stepperX.runSpeed();
-    stepperY.runSpeed();
-  }
+  do {
+    while (!yStartlimitSwitch.touched()) { // По y сместиться в крайнюю позицию
+      stepperX.setSpeed(STEPPERS_MAX_SPEED);
+      stepperY.setSpeed(STEPPERS_MAX_SPEED);
+      stepperX.runSpeed();
+      stepperY.runSpeed();
+    }
+    while (!xStartlimitSwitch.touched()) { // По x сместиться в крайнюю позицию
+      stepperX.setSpeed(STEPPERS_MAX_SPEED);
+      stepperY.setSpeed(-STEPPERS_MAX_SPEED);
+      stepperX.runSpeed();
+      stepperY.runSpeed();
+    }
+  } while (!yStartlimitSwitch.touched() && !xStartlimitSwitch.touched());
   // Установить позиции 0, 0
   stepperX.setCurrentPosition(0);
   stepperY.setCurrentPosition(0);
-  Serial.println(stepperX.currentPosition());
-  Serial.println(stepperY.currentPosition());
+  Serial.print("x, y = ");
+  Serial.println("0, 0");
 }
 
 float x, y, lx, ly;
 
+// Прямая задача кинематики
 void FK_CoreXY(float lx, float ly) { // void FK_CoreXY(long l1, long l2, float &x, float &y)
   lx *= DIST_MM_PER_STEP;
   ly *= DIST_MM_PER_STEP;
-  //x = (float)(lx + ly) / 2.0;
-  //y = x - (float)ly;
+  x = (float)(lx + ly) / 2.0;
+  y = x - (float)ly;
 }
 
+// Обратная задача кинематики
 void IK_CoreXY(float x, float y) { // void IK_CoreXY(float x, float y, long &l1, long &l2)
   lx = floor((x + y) / DIST_MM_PER_STEP);
   ly = floor((x - y) / DIST_MM_PER_STEP);
@@ -142,24 +164,21 @@ void manualControl() {
   while (true) {
     String command = Serial.readStringUntil('\n'); // Считываем из Serial строку до символа переноса на новую строку
     command.trim(); // Чистим символы
-    if (Serial.available() > 0) { // Если есть доступные данные
+    if (command.length() > 0) { // Если есть доступные данные
+      char strBuffer[11] = {};
+      command.toCharArray(strBuffer, 11);
       // Считываем x и y разделённых пробелом
-      float xVal = getValue(command, " ", 0).toFloat();
-      float yVal = getValue(command, " ", 1).toFloat();
+      float xVal = atoi(strtok(strBuffer, " "));
+      float yVal = atoi(strtok(NULL, " "));
+      Serial.print("xVal: "); Serial.print(xVal); Serial.print(", "); Serial.print("yVal: "); Serial.println(yVal);
+      IK_CoreXY(xVal, yVal);
+      //Serial.print("x: "); Serial.print(x); Serial.print(", "); Serial.print("y: "); Serial.println(y);
+      /*while (true) {
+        stepperX.moveTo(lx);
+        stepperY.moveTo(ly);
+        stepperX.run();
+        stepperY.run();
+      }*/
     }
   }
-}
-
-String getValue(String data, char separator, int index) {
-    int found = 0;
-    int strIndex[] = { 0, -1 };
-    int maxIndex = data.length() - 1;
-    for (int i = 0; i <= maxIndex && found <= index; i++) {
-        if (data.charAt(i) == separator || i == maxIndex) {
-            found++;
-            strIndex[0] = strIndex[1] + 1;
-            strIndex[1] = (i == maxIndex) ? i+1 : i;
-        }
-    }
-    return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
