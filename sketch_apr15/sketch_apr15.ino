@@ -12,22 +12,21 @@
 #define LIMIT_SWITCH_X_END_PORT 0 // Порт дальних концевиков от моторов
 #define LIMIT_SWITCH_X_END_SLOT 0 // Слот дальних концевиков от моторов
 
-#define LIMIT_SWITCH_Y_START_PORT PORT_4 // Порт концевика для коретки со стороны мотора X
-#define LIMIT_SWITCH_Y_START_SLOT SLOT_1 // Слот концевика для коретки со стороны мотора X
+#define LIMIT_SWITCH_Y_START_PORT PORT_3 // Порт концевика для коретки со стороны мотора X
+#define LIMIT_SWITCH_Y_START_SLOT SLOT_2 // Слот концевика для коретки со стороны мотора X
 
 #define LIMIT_SWITCH_Y_END_PORT 0 // Порт концевика для коретки со стороны мотора Y
 #define LIMIT_SWITCH_Y_END_SLOT 0 // Слот концевика для коретки со стороны мотора Y
 
-// Не работает концевик на 8, 7 в слоте 1
 MeLimitSwitch xStartlimitSwitch(LIMIT_SWITCH_X_START_PORT, LIMIT_SWITCH_X_START_SLOT);
 MeLimitSwitch yStartlimitSwitch(LIMIT_SWITCH_Y_START_PORT, LIMIT_SWITCH_Y_START_SLOT);
-//MePort xStartlimitSwitch(LIMIT_SWITCH_X_START);
+//MePort xStartlimitSwitch(LIMIT_SWITCH_X_START); // !Концевик не работает на 8, 7 в слоте 1, а только в слоте 2
 
 // Серво инструмента
-#define SERVO_Z_PIN 0 // Серво для перемещения по Z инструмента
+#define SERVO_Z_PIN 8 // Порт серво для перемещения по Z инструмента
 #define SERVO_Z2_PIN 0 // Дополнительный серво по Z у инструмента
 
-//Servo servoZ;
+Servo servoZ;
 
 // Шаговые двигатели X, Y
 #define STEPPER_X_DIR_PIN mePort[PORT_1].s1
@@ -77,11 +76,13 @@ void setup() {
   stepperX.setAcceleration(STEPPERS_ACCEL); // Установка ускорения, в шагах в секунду за секунду
   stepperY.setMaxSpeed(STEPPERS_MAX_SPEED);
   stepperY.setAcceleration(STEPPERS_ACCEL);
-  //servoZ.attach(SERVO_Z_PIN);
+  servoZ.attach(SERVO_Z_PIN);
+  servoZ.write(0);
 }
 
 void loop() {
   searchStartPos(); // Вернуться на базу и установить 0-е позиции
+  //servoZ.write(180);
   manualControl(); // Ручное управление
   //mySolve();
   /*
@@ -95,7 +96,7 @@ void loop() {
     stepperY.run();
     Serial.println(stepperX.currentPosition());
   }*/
-  while(true) { delay(100); }
+  while(true) { delay(100); } // Конец выполнения
 }
 
 void mySolve() {
@@ -106,7 +107,6 @@ void mySolve() {
     //int flag = xStartlimitSwitch.touched();
     //Serial.print(flag);
   }
-  while(true) { delay(100); } // Конец выполнения
   Serial.println();
 }
 
