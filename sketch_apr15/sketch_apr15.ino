@@ -38,7 +38,8 @@ Servo servoZ;
 #define STEPPERS_ACCEL 15000 // Ускорение
 #define STEP_TO_ROTATION 400 // Шагов за оборот - 360 градусов
 #define DEG_PER_STEP 360 / STEP_TO_ROTATION // Градусы за шаг - 0.9
-#define DIST_MM_PER_STEP 0.04 // Дистанция в мм за прохождение 1 шага // 0.0625
+#define DIST_MM_PER_STEP_X 0.04 // Дистанция в мм за прохождение 1 шага // 0.0625
+#define DIST_MM_PER_STEP_Y 0.04
 
 AccelStepper stepperX(AccelStepper::DRIVER, STEPPER_X_STP_PIN, STEPPER_X_DIR_PIN);
 AccelStepper stepperY(AccelStepper::DRIVER, STEPPER_Y_STP_PIN, STEPPER_Y_DIR_PIN);
@@ -136,16 +137,16 @@ float x, y, lx, ly;
 
 // Прямая задача кинематики
 void FK_CoreXY(float lx, float ly) { // void FK_CoreXY(long l1, long l2, float &x, float &y)
-  lx *= DIST_MM_PER_STEP;
-  ly *= DIST_MM_PER_STEP;
+  lx *= DIST_MM_PER_STEP_X;
+  ly *= DIST_MM_PER_STEP_Y;
   x = (float)(lx + ly) / 2.0;
   y = x - (float)ly;
 }
 
 // Обратная задача кинематики
 int* IK_CoreXY(float x, float y) { // void IK_CoreXY(float x, float y, long &l1, long &l2)
-  lx = floor((x + y) / DIST_MM_PER_STEP) * -1;
-  ly = floor((x - y) / DIST_MM_PER_STEP) * -1;
+  lx = floor((x + y) / DIST_MM_PER_STEP_X) * -1;
+  ly = floor((x - y) / DIST_MM_PER_STEP_Y) * -1;
   int *new_array = new int[2];
   new_array[0] = lx;
   new_array[1] = ly;
@@ -154,8 +155,8 @@ int* IK_CoreXY(float x, float y) { // void IK_CoreXY(float x, float y, long &l1,
 
 // Обратная задача кинематики
 int* MyIK_CoreXY(float x, float y) { // void IK_CoreXY(float x, float y, long &l1, long &l2)
-  lx = floor(x / DIST_MM_PER_STEP) * -1;
-  ly = floor(x / DIST_MM_PER_STEP) * -1;
+  lx = floor(x / DIST_MM_PER_STEP_X) * -1;
+  ly = floor(x / DIST_MM_PER_STEP_Y) * -1;
   int *new_array = new int[2];
   new_array[0] = lx;
   new_array[1] = ly;
