@@ -46,11 +46,6 @@ AccelStepper stepperY(AccelStepper::DRIVER, STEPPER_Y_STP_PIN, STEPPER_Y_DIR_PIN
 
 GTimer_ms myTimer1(10);
 
-#define CAM_SERIAL_RX 0
-#define CAM_SERIAL_TX 0
-
-SoftwareSerial camSerial(CAM_SERIAL_RX, CAM_SERIAL_TX); // Сериал для общения с камерой 
-
 // Как нужно скомплектовать коробку 
 const String boxCompleteSolve[3][3] = {
   {"RC", "BC", "GC"},
@@ -179,16 +174,13 @@ void manualControl() {
       int xVal = atoi(strtok(strBuffer, " "));
       int yVal = atoi(strtok(NULL, " "));
       Serial.print("xVal: "); Serial.print(xVal); Serial.print(", "); Serial.print("yVal: "); Serial.println(yVal);
-      int* pos = MyIK_CoreXY(xVal, yVal);
+      int* pos = IK_CoreXY(xVal, yVal);
       Serial.print("x: "); Serial.print(pos[0]); Serial.print(", "); Serial.print("y: "); Serial.println(pos[1]);
       while (true) {
         stepperX.moveTo(lx);
         stepperY.moveTo(ly);
         stepperX.run();
         stepperY.run();
-        /*Serial.print(stepperX.currentPosition());
-        Serial.print(" ");
-        Serial.println(stepperY.currentPosition());*/
       }
     }
   }
