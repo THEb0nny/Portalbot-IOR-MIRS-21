@@ -139,6 +139,10 @@ void FK_CoreXY(float lx, float ly) { // void FK_CoreXY(long l1, long l2, float &
   ly *= DIST_MM_PER_STEP_Y;
   x = (float)(lx + ly) / 2.0;
   y = x - (float)ly;
+  int *return_array = new int[2];
+  return_array[0] = x;
+  return_array[1] = y;
+  return return_array;
 }
 
 // Обратная задача кинематики
