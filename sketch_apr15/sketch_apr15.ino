@@ -1,8 +1,8 @@
 #include <SoftwareSerial.h>
 #include <Arduino.h>
-//#include <Servo.h>
 #include <MeOrion.h>
 #include <AccelStepper.h>
+//#include <Servo.h>
 #include <math.h>
 #include "GyverTimer.h"
 
@@ -25,6 +25,9 @@ MeLimitSwitch yStartlimitSwitch(LIMIT_SWITCH_Y_START_PORT, LIMIT_SWITCH_Y_START_
 // Серво инструмента
 #define SERVO_Z_PIN 8 // Порт серво для перемещения по Z инструмента
 #define SERVO_Z2_PIN 0 // Дополнительный серво по Z у инструмента
+
+#define MAX_DIST_MM 140 // Максимальная дистанция для перемещения в мм
+#define DIST_TO_CENTER_CARRIAGE 30 // Расстояние до центра корретки в мм
 
 Servo servoZ;
 
@@ -142,20 +145,10 @@ void FK_CoreXY(float lx, float ly) { // void FK_CoreXY(long l1, long l2, float &
 int* IK_CoreXY(float x, float y) { // void IK_CoreXY(float x, float y, long &l1, long &l2)
   lx = floor((x + y) / DIST_MM_PER_STEP_X) * -1;
   ly = floor((x - y) / DIST_MM_PER_STEP_Y) * -1;
-  int *new_array = new int[2];
-  new_array[0] = lx;
-  new_array[1] = ly;
-  return new_array;
-}
-
-// Обратная задача кинематики
-int* MyIK_CoreXY(float x, float y) { // void IK_CoreXY(float x, float y, long &l1, long &l2)
-  lx = floor(x / DIST_MM_PER_STEP_X) * -1;
-  ly = floor(x / DIST_MM_PER_STEP_Y) * -1;
-  int *new_array = new int[2];
-  new_array[0] = lx;
-  new_array[1] = ly;
-  return new_array;
+  int *return_array = new int[2];
+  return_array[0] = lx;
+  return_array[1] = ly;
+  return return_array;
 }
 
 void moveToolZ() {
@@ -174,13 +167,20 @@ void manualControl() {
       int xVal = atoi(strtok(strBuffer, " "));
       int yVal = atoi(strtok(NULL, " "));
       Serial.print("xVal: "); Serial.print(xVal); Serial.print(", "); Serial.print("yVal: "); Serial.println(yVal);
-      int* pos = IK_CoreXY(xVal, yVal);
-      Serial.print("x: "); Serial.print(pos[0]); Serial.print(", "); Serial.print("y: "); Serial.println(pos[1]);
-      while (true) {
-        stepperX.moveTo(lx);
-        stepperY.moveTo(ly);
-        stepperX.run();
-        stepperY.run();
+      if (xVal <= MAX_DIST_MM && xVal >= 0 && yVal <= MAX_DIST_MM && yVal >= 0) {
+        int* pos = IK_CoreXY(xVal, yVal);
+        Serial.print("x: "); Serial.print(pos[0]); Serial.print(", "); Serial.print("y: "); Serial.println(pos[1]);
+        while (true) { // Перемещаем моторы в позицию
+          stepperX.moveTo(pos[0]);
+          stepperY.moveTo(pos[1]);
+          stepperX.run();
+          stepperY.run();
+          if (!stepperX.isRunning() && !stepperY.isRunning()) break; // Мотор остановился выполнив перемещение
+        }
+        if (xVal == 0 && yVal == 0) { // Если позиция была указана 0, 0 то по окончанию обновить стартовую позицию
+          stepperX.setCurrentPosition(0);
+          stepperY.setCurrentPosition(0);
+        }
       }
     }
   }
