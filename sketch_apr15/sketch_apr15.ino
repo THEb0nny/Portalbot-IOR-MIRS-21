@@ -2,7 +2,6 @@
 #include <Arduino.h>
 #include <MeOrion.h>
 #include <AccelStepper.h>
-//#include <Servo.h>
 #include <math.h>
 #include "GyverTimer.h"
 
@@ -26,10 +25,11 @@ MeLimitSwitch yStartlimitSwitch(LIMIT_SWITCH_Y_START_PORT, LIMIT_SWITCH_Y_START_
 #define SERVO_Z_PIN 8 // Порт серво для перемещения по Z инструмента
 #define SERVO_Z2_PIN 0 // Дополнительный серво по Z у инструмента
 
-#define MAX_DIST_MM 140 // Максимальная дистанция для перемещения в мм
+#define MAX_X_DIST_MM 140 // Максимальная дистанция по X для перемещения в мм
+#define MAX_Y_DIST_MM 150 // Максимальная дистанция по Y для перемещения в мм
 #define DIST_TO_CENTER_CARRIAGE 30 // Расстояние до центра корретки в мм
 
-Servo servoZ;
+Servo servoZ, servoZ2; // Серво инструмента
 
 // Шаговые двигатели X, Y
 #define STEPPER_X_DIR_PIN mePort[PORT_1].s1
@@ -37,30 +37,39 @@ Servo servoZ;
 #define STEPPER_Y_DIR_PIN mePort[PORT_2].s1
 #define STEPPER_Y_STP_PIN mePort[PORT_2].s2
 
-#define STEPPERS_MAX_SPEED 5000 // Максимальная скорость
-#define STEPPERS_ACCEL 15000 // Ускорение
+#define STEPPERS_MAX_SPEED 5000 // Максимальная скорость шагового двигателя
+#define STEPPERS_ACCEL 15000 // Ускорение шагового двигателя
 #define STEP_TO_ROTATION 400 // Шагов за оборот - 360 градусов
-#define DEG_PER_STEP 360 / STEP_TO_ROTATION // Градусы за шаг - 0.9
-#define DIST_MM_PER_STEP_X 0.04 // Дистанция в мм за прохождение 1 шага // 0.0625
+#define DIST_MM_PER_STEP_X 0.04 // Дистанция в мм за прохождение 1 шага
 #define DIST_MM_PER_STEP_Y 0.04
 
+// Создаём объекты с шаговыми моторами
 AccelStepper stepperX(AccelStepper::DRIVER, STEPPER_X_STP_PIN, STEPPER_X_DIR_PIN);
 AccelStepper stepperY(AccelStepper::DRIVER, STEPPER_Y_STP_PIN, STEPPER_Y_DIR_PIN);
 
-GTimer_ms myTimer1(10);
+GTimer_ms myTimer1(10); // Объект таймера
 
 // Как нужно скомплектовать коробку 
-const String boxCompleteSolve[3][3] = {
+const String boxCompletateSolve[3][3] = {
   {"RC", "BC", "GC"},
   {"RCC", "BCC", "GCC"},
   {"RB", "BB", "GB"}
 }; // RC - красный куб, RCC - красный куб с выемкой, RB - красный шар
 
-// Переменые для хранения фигур после определения камерой
-String tStorage[3] = {"N", "N", "N"};
-String bStorage[3] = {"N", "N", "N"};
-String lStorage[3] = {"N", "N", "N"};
-String rStorage[3] = {"N", "N", "N"};
+String storage[4][3] = { // Хранилище
+  {"N", "N", "N"}, // Выерхний
+  {"N", "N", "N"}, // Левый
+  {"N", "N", "N"}, // Правый
+  {"N", "N", "N"} // Нижний
+};
+
+const int cellsPos[5][5] = { // Переменые для хранения фигур после определения камерой
+  {-1, 0, 0, 0, -1},
+  {0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 0},
+  {-1, 0, 0, 0, -1}
+}; // Крайние пункты должны быть -1
 
 // ИНФА
 //http://forum.amperka.ru/threads/%D0%91%D0%B8%D0%B1%D0%BB%D0%B8%D0%BE%D1%82%D0%B5%D0%BA%D0%B0-accelstepper.11388/
@@ -71,40 +80,24 @@ String rStorage[3] = {"N", "N", "N"};
 
 void setup() {
   Serial.begin(9600);
-  stepperX.setMaxSpeed(STEPPERS_MAX_SPEED); // Установка максимальной скорости (оборотов в минуту). Скорость по умолчанию очень низкая, так что её требуется переопределить. При движении шаговый двигатель будет ускоряться до этой максимальной скорости и замедляться при подходе к концу движения
-  stepperX.setAcceleration(STEPPERS_ACCEL); // Установка ускорения, в шагах в секунду за секунду
-  stepperY.setMaxSpeed(STEPPERS_MAX_SPEED);
-  stepperY.setAcceleration(STEPPERS_ACCEL);
+  stepperX.setMaxSpeed(STEPPERS_MAX_SPEED); stepperY.setMaxSpeed(STEPPERS_MAX_SPEED); // Установка максимальной скорости (оборотов в минуту). При движении шаговый двигатель будет ускоряться до этой максимальной скорости и замедляться при подходе к концу движения
+  stepperX.setAcceleration(STEPPERS_ACCEL); stepperY.setAcceleration(STEPPERS_ACCEL); // Установка ускорения, в шагах в секунду за секунду
   servoZ.attach(SERVO_Z_PIN);
   servoZ.write(0);
 }
 
 void loop() {
   searchStartPos(); // Вернуться на базу и установить 0-е позиции
-  //servoZ.write(180);
   manualControl(); // Ручное управление
+  //servoZ.write(180);
   //mySolve();
-  /*
-  while (stepperY.currentPosition() < 100) {
-    stepperY.moveTo(100);
-    stepperY.run();
-    Serial.println(stepperX.currentPosition());
-  }
-  while (stepperX.currentPosition() < 100) {
-    stepperY.moveTo(100);
-    stepperY.run();
-    Serial.println(stepperX.currentPosition());
-  }*/
   while(true) { delay(100); } // Конец выполнения
 }
 
 void mySolve() {
-  // Сдвинутся по X и Y в нулевую точку и по сигналу с концевика остановиться, обнулить позицию, зажечь свет
   // Получить данные с камеры
   if (myTimer1.isReady()) {
-    //int flag1 = !xStartlimitSwitch.dpRead1(); //xStartlimitSwitch.dpRead2(); x2limitSwitchB.touched();
-    //int flag = xStartlimitSwitch.touched();
-    //Serial.print(flag);
+    
   }
   Serial.println();
 }
@@ -112,29 +105,23 @@ void mySolve() {
 void searchStartPos() {
   do {
     while (!yStartlimitSwitch.touched()) { // По y сместиться в крайнюю позицию
-      stepperX.setSpeed(STEPPERS_MAX_SPEED);
-      stepperY.setSpeed(STEPPERS_MAX_SPEED);
-      stepperX.runSpeed();
-      stepperY.runSpeed();
+      stepperX.setSpeed(STEPPERS_MAX_SPEED); stepperY.setSpeed(STEPPERS_MAX_SPEED);
+      stepperX.runSpeed(); stepperY.runSpeed();
     }
     while (!xStartlimitSwitch.touched()) { // По x сместиться в крайнюю позицию
-      stepperX.setSpeed(STEPPERS_MAX_SPEED);
-      stepperY.setSpeed(-STEPPERS_MAX_SPEED);
-      stepperX.runSpeed();
-      stepperY.runSpeed();
+      stepperX.setSpeed(STEPPERS_MAX_SPEED); stepperY.setSpeed(-STEPPERS_MAX_SPEED);
+      stepperX.runSpeed(); stepperY.runSpeed();
     }
-  } while (!yStartlimitSwitch.touched() && !xStartlimitSwitch.touched());
+  } while (!yStartlimitSwitch.touched() && !xStartlimitSwitch.touched()); // Пока концевики не сработали
   // Установить позиции 0, 0
-  stepperX.setCurrentPosition(0);
-  stepperY.setCurrentPosition(0);
-  Serial.print("x, y = ");
-  Serial.println("0, 0");
+  stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0);
+  Serial.println("x, y = 0, 0");
 }
 
 float x, y, lx, ly;
 
 // Прямая задача кинематики
-void FK_CoreXY(float lx, float ly) { // void FK_CoreXY(long l1, long l2, float &x, float &y)
+int* FK_CoreXY(float lx, float ly) { // void FK_CoreXY(long l1, long l2, float &x, float &y)
   lx *= DIST_MM_PER_STEP_X;
   ly *= DIST_MM_PER_STEP_Y;
   x = (float)(lx + ly) / 2.0;
@@ -171,19 +158,16 @@ void manualControl() {
       int xVal = atoi(strtok(strBuffer, " "));
       int yVal = atoi(strtok(NULL, " "));
       Serial.print("xVal: "); Serial.print(xVal); Serial.print(", "); Serial.print("yVal: "); Serial.println(yVal);
-      if (xVal <= MAX_DIST_MM && xVal >= 0 && yVal <= MAX_DIST_MM && yVal >= 0) {
+      if (xVal <= MAX_X_DIST_MM && xVal >= 0 && yVal <= MAX_Y_DIST_MM && yVal >= 0) {
         int* pos = IK_CoreXY(xVal, yVal);
         Serial.print("x: "); Serial.print(pos[0]); Serial.print(", "); Serial.print("y: "); Serial.println(pos[1]);
         while (true) { // Перемещаем моторы в позицию
-          stepperX.moveTo(pos[0]);
-          stepperY.moveTo(pos[1]);
-          stepperX.run();
-          stepperY.run();
+          stepperX.moveTo(pos[0]); stepperY.moveTo(pos[1]);
+          stepperX.run(); stepperY.run();
           if (!stepperX.isRunning() && !stepperY.isRunning()) break; // Мотор остановился выполнив перемещение
         }
         if (xVal == 0 && yVal == 0) { // Если позиция была указана 0, 0 то по окончанию обновить стартовую позицию
-          stepperX.setCurrentPosition(0);
-          stepperY.setCurrentPosition(0);
+          stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0);
         }
       }
     }
