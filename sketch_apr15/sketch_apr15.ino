@@ -3,6 +3,7 @@
 #include <MeOrion.h>
 #include <AccelStepper.h>
 #include <math.h>
+#include "TrackingCamI2C.h"
 #include "GyverTimer.h"
 
 #define LIMIT_SWITCH_X_START_PORT PORT_3 // Порт ближних концевиков к моторам
@@ -49,6 +50,9 @@ AccelStepper stepperY(AccelStepper::DRIVER, STEPPER_Y_STP_PIN, STEPPER_Y_DIR_PIN
 
 GTimer_ms myTimer1(10); // Объект таймера
 
+TrackingCamI2C trackingCam;
+unsigned long previousMillis = 0; // stores last time cam was updated
+
 // Как нужно скомплектовать коробку 
 const String boxCompletateSolve[3][3] = {
   {"RC", "BC", "GC"},
@@ -63,12 +67,20 @@ String storage[4][3] = { // Хранилище
   {"N", "N", "N"} // Нижний
 };
 
-const int cellsPos[5][5] = { // Переменые для хранения фигур после определения камерой
-  {-1, 0, 0, 0, -1},
-  {0, 0, 0, 0, 0},
-  {0, 0, 0, 0, 0},
-  {0, 0, 0, 0, 0},
-  {-1, 0, 0, 0, -1}
+const int cellsPosX[5][5] = { // Переменые для хранения фигур после определения камерой по X
+  {-1, 35, 70, 100, -1},
+  {10, 40, 75, 105, 135},
+  {10, 40, 70, 105, 135},
+  {10, 40, 70, 100, 130},
+  {-1, 40, 70, 100, -1}
+}; // Крайние пункты должны быть -1
+
+const int cellsPosY[5][5] = { // Переменые для хранения фигур после определения камерой по Y
+  {-1, 140, 140, 140, -1},
+  {105, 105, 105, 105, 105},
+  {75, 75, 75, 75, 75},
+  {45, 45, 45, 45, 45},
+  {-1, 10, 10, 10, -1}
 }; // Крайние пункты должны быть -1
 
 // ИНФА
@@ -84,14 +96,53 @@ void setup() {
   stepperX.setAcceleration(STEPPERS_ACCEL); stepperY.setAcceleration(STEPPERS_ACCEL); // Установка ускорения, в шагах в секунду за секунду
   servoZ.attach(SERVO_Z_PIN);
   servoZ.write(0);
+  /* TrackingCamI2C::init(uint8_t cam_id, uint32_t speed);
+   *   cam_id - 1..127, default 51
+   *   speed - 100000/400000, cam enables auto detection of master clock 
+   */
+  //trackingCam.init(51, 400000);
+  delay(5000);
 }
 
 void loop() {
   searchStartPos(); // Вернуться на базу и установить 0-е позиции
-  manualControl(); // Ручное управление
+  manualControl(2); // Ручное управление
   //servoZ.write(180);
   //mySolve();
   while(true) { delay(100); } // Конец выполнения
+}
+
+void camRead() {
+  while (true) {
+    uint8_t n = trackingCam.readBlobs(5); // read data about first 5 blobs
+    Serial.println("All blobs");
+    Serial.println(n); // print numbers of blobs
+    for(int i = 0; i < n; i++) // print information about all blobs
+    {
+      Serial.print(trackingCam.blob[i].type, DEC);
+      Serial.print(" ");
+      Serial.print(trackingCam.blob[i].dummy, DEC);
+      Serial.print(" ");
+      Serial.print(trackingCam.blob[i].cx, DEC);
+      Serial.print(" ");
+      Serial.print(trackingCam.blob[i].cy, DEC);
+      Serial.print(" ");
+      Serial.print(trackingCam.blob[i].area, DEC);
+      Serial.print(" ");
+      Serial.print(trackingCam.blob[i].left, DEC);
+      Serial.print(" ");
+      Serial.print(trackingCam.blob[i].right, DEC);
+      Serial.print(" ");
+      Serial.print(trackingCam.blob[i].top, DEC);
+      Serial.print(" ");
+      Serial.print(trackingCam.blob[i].bottom, DEC);
+      Serial.println(" ");
+    }
+  
+    // wait for the next frame
+    while(millis() - previousMillis < 33) {};
+    previousMillis = millis();
+  }
 }
 
 void mySolve() {
@@ -147,7 +198,8 @@ void moveToolZ() {
 }
 
 // Управление из Serial
-void manualControl() {
+void manualControl(int type) {
+  int* pos = IK_CoreXY(0, 0);
   while (true) {
     String command = Serial.readStringUntil('\n'); // Считываем из Serial строку до символа переноса на новую строку
     command.trim(); // Чистим символы
@@ -158,17 +210,26 @@ void manualControl() {
       int xVal = atoi(strtok(strBuffer, " "));
       int yVal = atoi(strtok(NULL, " "));
       Serial.print("xVal: "); Serial.print(xVal); Serial.print(", "); Serial.print("yVal: "); Serial.println(yVal);
-      if (xVal <= MAX_X_DIST_MM && xVal >= 0 && yVal <= MAX_Y_DIST_MM && yVal >= 0) {
-        int* pos = IK_CoreXY(xVal, yVal);
+      
+      if (type == 1) {
+        if (xVal <= MAX_X_DIST_MM && xVal >= 0 && yVal <= MAX_Y_DIST_MM && yVal >= 0) {
+          pos = IK_CoreXY(xVal, yVal);
+        }
         Serial.print("x: "); Serial.print(pos[0]); Serial.print(", "); Serial.print("y: "); Serial.println(pos[1]);
-        while (true) { // Перемещаем моторы в позицию
-          stepperX.moveTo(pos[0]); stepperY.moveTo(pos[1]);
-          stepperX.run(); stepperY.run();
-          if (!stepperX.isRunning() && !stepperY.isRunning()) break; // Мотор остановился выполнив перемещение
-        }
-        if (xVal == 0 && yVal == 0) { // Если позиция была указана 0, 0 то по окончанию обновить стартовую позицию
-          stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0);
-        }
+      } else if (type == 2) {  
+        if (xVal >= 0 && xVal <= 4 && yVal >= 0 && yVal <= 4 || xVal != 0 && yVal != 0 || xVal != 4 && yVal != 0 || xVal != 0 && yVal != 4 || xVal != 4 && yVal != 4) {
+          pos = IK_CoreXY(cellsPosX[xVal][yVal], cellsPosY[xVal][yVal]);
+        } else pos = IK_CoreXY(0, 0);
+        Serial.print("iCell: "); Serial.print(pos[0]); Serial.print(", "); Serial.print("jCell: "); Serial.println(pos[1]);
+      }
+      
+      while (true) { // Перемещаем моторы в позицию
+        stepperX.moveTo(pos[0]); stepperY.moveTo(pos[1]);
+        stepperX.run(); stepperY.run();
+        if (!stepperX.isRunning() && !stepperY.isRunning()) break; // Мотор остановился выполнив перемещение
+      }
+      if (xVal == 0 && yVal == 0) { // Если позиция была указана 0, 0 то по окончанию обновить стартовую позицию
+        stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0);
       }
     }
   }
