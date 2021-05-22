@@ -173,7 +173,7 @@ void searchStartPos() {
   // Установить позиции 0, 0
   stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0);
   Serial.println("x, y = 0, 0");
-  buzzer.tone(255, 500);
+  buzzer.tone(255, 500); // Пищим
 }
 
 float x, y, lx, ly;
@@ -237,7 +237,7 @@ void manualControl(int type) {
       }
       if (xVal == 0 && yVal == 0) { // Если позиция была указана 0, 0 то по окончанию обновить стартовую позицию
         stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0);
-        buzzer.tone(255, 500);
+        buzzer.tone(255, 500); // Пищим
       }
     }
   }
