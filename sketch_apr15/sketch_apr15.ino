@@ -221,13 +221,13 @@ void manualControl(int type) {
       if (type == 1) {
         if (xVal <= MAX_X_DIST_MM && xVal >= 0 && yVal <= MAX_Y_DIST_MM && yVal >= 0) {
           pos = IK_CoreXY(xVal, yVal);
+          Serial.print("x: "); Serial.print(pos[0]); Serial.print(", "); Serial.print("y: "); Serial.println(pos[1]);
         }
-        Serial.print("x: "); Serial.print(pos[0]); Serial.print(", "); Serial.print("y: "); Serial.println(pos[1]);
       } else if (type == 2) {  
         if (xVal >= 0 && xVal <= 4 && yVal >= 0 && yVal <= 4 || xVal != 0 && yVal != 0 || xVal != 4 && yVal != 0 || xVal != 0 && yVal != 4 || xVal != 4 && yVal != 4) {
           pos = IK_CoreXY(cellsPosX[xVal][yVal], cellsPosY[xVal][yVal]);
+          Serial.print("iCell: "); Serial.print(pos[0]); Serial.print(", "); Serial.print("jCell: "); Serial.println(pos[1]);
         }
-        Serial.print("iCell: "); Serial.print(pos[0]); Serial.print(", "); Serial.print("jCell: "); Serial.println(pos[1]);
       }
       
       while (true) { // Перемещаем моторы в позицию
