@@ -18,10 +18,6 @@
 #define LIMIT_SWITCH_Y_END_PORT 0 // Порт концевика для коретки со стороны мотора Y
 #define LIMIT_SWITCH_Y_END_SLOT 0 // Слот концевика для коретки со стороны мотора Y
 
-MeLimitSwitch xStartlimitSwitch(LIMIT_SWITCH_X_START_PORT, LIMIT_SWITCH_X_START_SLOT);
-MeLimitSwitch yStartlimitSwitch(LIMIT_SWITCH_Y_START_PORT, LIMIT_SWITCH_Y_START_SLOT);
-//MePort xStartlimitSwitch(LIMIT_SWITCH_X_START); // !Концевик не работает на 8, 7 в слоте 1, а только в слоте 2
-
 // Серво инструмента
 #define SERVO_Z_PIN 8 // Порт серво для перемещения по Z инструмента
 #define SERVO_Z2_PIN 0 // Дополнительный серво по Z у инструмента
@@ -30,7 +26,8 @@ MeLimitSwitch yStartlimitSwitch(LIMIT_SWITCH_Y_START_PORT, LIMIT_SWITCH_Y_START_
 #define MAX_Y_DIST_MM 150 // Максимальная дистанция по Y для перемещения в мм
 #define DIST_TO_CENTER_CARRIAGE 30 // Расстояние до центра корретки в мм
 
-Servo servoZ, servoZ2; // Серво инструмента
+#define BUZZER_PORT PORT_4
+#define BUZZER_SLOT SLOT_2
 
 // Шаговые двигатели X, Y
 #define STEPPER_X_DIR_PIN mePort[PORT_1].s1
@@ -43,6 +40,14 @@ Servo servoZ, servoZ2; // Серво инструмента
 #define STEP_TO_ROTATION 400 // Шагов за оборот - 360 градусов
 #define DIST_MM_PER_STEP_X 0.04 // Дистанция в мм за прохождение 1 шага
 #define DIST_MM_PER_STEP_Y 0.04
+
+MeLimitSwitch xStartlimitSwitch(LIMIT_SWITCH_X_START_PORT, LIMIT_SWITCH_X_START_SLOT);
+MeLimitSwitch yStartlimitSwitch(LIMIT_SWITCH_Y_START_PORT, LIMIT_SWITCH_Y_START_SLOT);
+//MePort xStartlimitSwitch(LIMIT_SWITCH_X_START); // !Концевик не работает на 8, 7 в слоте 1, а только в слоте 2
+
+MeBuzzer buzzer(BUZZER_PORT, BUZZER_SLOT);
+
+Servo servoZ, servoZ2; // Серво инструмента
 
 // Создаём объекты с шаговыми моторами
 AccelStepper stepperX(AccelStepper::DRIVER, STEPPER_X_STP_PIN, STEPPER_X_DIR_PIN);
@@ -101,7 +106,8 @@ void setup() {
    *   speed - 100000/400000, cam enables auto detection of master clock 
    */
   //trackingCam.init(51, 400000);
-  delay(5000);
+  //delay(5000);
+  buzzer.noTone();
 }
 
 void loop() {
@@ -167,6 +173,7 @@ void searchStartPos() {
   // Установить позиции 0, 0
   stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0);
   Serial.println("x, y = 0, 0");
+  buzzer.tone(255, 500);
 }
 
 float x, y, lx, ly;
@@ -219,7 +226,7 @@ void manualControl(int type) {
       } else if (type == 2) {  
         if (xVal >= 0 && xVal <= 4 && yVal >= 0 && yVal <= 4 || xVal != 0 && yVal != 0 || xVal != 4 && yVal != 0 || xVal != 0 && yVal != 4 || xVal != 4 && yVal != 4) {
           pos = IK_CoreXY(cellsPosX[xVal][yVal], cellsPosY[xVal][yVal]);
-        } else pos = IK_CoreXY(0, 0);
+        }
         Serial.print("iCell: "); Serial.print(pos[0]); Serial.print(", "); Serial.print("jCell: "); Serial.println(pos[1]);
       }
       
@@ -230,6 +237,7 @@ void manualControl(int type) {
       }
       if (xVal == 0 && yVal == 0) { // Если позиция была указана 0, 0 то по окончанию обновить стартовую позицию
         stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0);
+        buzzer.tone(255, 500);
       }
     }
   }
