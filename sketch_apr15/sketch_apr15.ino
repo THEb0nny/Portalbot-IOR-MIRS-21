@@ -1,3 +1,14 @@
+/** Arduino I2C blobs example.
+ * Settings: Blob detector, I2C, addr 51, Dynamixel API, 5V.
+ * Wiring:
+ *       Camera         Arduino Camera
+ * 1-VF >|O O|  2-+5      SCL  -  IC0
+ * 3-Gnd |O O|  4-Gnd     SDA  -  ID1
+ * 5-TX   O O|  6-RX      5V   -  +5
+ * 7-SCK |O O|  8-SNS     Gnd  -  Gnd
+ * 9-IC0 |O O| 10-ID1     
+ */ 
+
 #include <SoftwareSerial.h>
 #include <Arduino.h>
 #include <MeOrion.h>
@@ -20,7 +31,7 @@
 
 // Серво инструмента
 #define SERVO_Z_PIN 8 // Порт серво для перемещения по Z инструмента
-#define SERVO_Z2_PIN 0 // Дополнительный серво по Z у инструмента
+#define SERVO_TOOL_PIN 0 // Дополнительный серво по Z у инструмента
 
 #define MAX_X_DIST_MM 140 // Максимальная дистанция по X для перемещения в мм
 #define MAX_Y_DIST_MM 150 // Максимальная дистанция по Y для перемещения в мм
@@ -57,13 +68,11 @@ MeRGBLed led(RGB_PORT, RGB_SLOT); // RGB лента
 AccelStepper stepperX(AccelStepper::DRIVER, STEPPER_X_STP_PIN, STEPPER_X_DIR_PIN);
 AccelStepper stepperY(AccelStepper::DRIVER, STEPPER_Y_STP_PIN, STEPPER_Y_DIR_PIN);
 
-Servo servoZ, servoZ2; // Серво инструмента
+Servo servoZ, servoTool; // Серво инструмента
 
 GTimer_ms myTimer1(10); // Таймер
 
 TrackingCamI2C trackingCam; // Камера
-
-unsigned long previousMillis = 0; // stores last time cam was updated
 
 // Как нужно скомплектовать коробку 
 const String boxCompletateSolve[3][3] = {
@@ -123,15 +132,8 @@ void setup() {
 void loop() {
   searchStartPos(); // Вернуться на базу и установить 0-е позиции
   manualControl(2); // Ручное управление
-  //servoZ.write(180);
   //mySolve();
   while(true) { delay(100); } // Конец выполнения
-}
-
-void indicator(short i, bool state) {
-  if (state) led.setColorAt(i, 255, 0, 0); // Включаем красным выбранный
-  else led.setColorAt(i, 0, 0, 1); // Ставим синим выбранный
-  led.show();
 }
 
 void mySolve() {
@@ -142,6 +144,12 @@ void mySolve() {
   Serial.println();
 }
 
+void indicator(short i, bool state) {
+  if (state) led.setColorAt(i, 255, 0, 0); // Включаем красным выбранный
+  else led.setColorAt(i, 0, 0, 1); // Ставим синим выбранный
+  led.show();
+}
+
 void searchStartPos() {
   do {
     while (!yStartlimitSwitch.touched()) { // По y сместиться в крайнюю позицию
@@ -149,14 +157,14 @@ void searchStartPos() {
       stepperX.runSpeed(); stepperY.runSpeed();
     }
     if (yStartlimitSwitch.touched()) indicator(0, true); // Включаем светодиоды нулевого положения
-    else indicator(0, false);
+    else indicator(0, false); // Иначе выключаем
     
     while (!xStartlimitSwitch.touched()) { // По x сместиться в крайнюю позицию
       stepperX.setSpeed(STEPPERS_MAX_SPEED); stepperY.setSpeed(-STEPPERS_MAX_SPEED);
       stepperX.runSpeed(); stepperY.runSpeed();
     }
-    if (xStartlimitSwitch.touched()) indicator(1, true);
-    else indicator(1, false);
+    if (xStartlimitSwitch.touched()) indicator(1, true); // Включаем светодиоды нулевого положения
+    else indicator(1, false); // Иначе выключаем
   } while (!yStartlimitSwitch.touched() && !xStartlimitSwitch.touched()); // Пока концевики не сработали
   
   // Включаем светодиоды нулевого положения
@@ -190,6 +198,14 @@ int* IK_CoreXY(float x, float y) { // void IK_CoreXY(float x, float y, long &l1,
   return_array[0] = lx;
   return_array[1] = ly;
   return return_array;
+}
+
+void controlZ(short pos) {
+  //servoZ.write(pos);
+}
+
+void controlTool() {
+  
 }
 
 // Управление из Serial
@@ -231,14 +247,16 @@ void manualControl(int type) {
       }
       if (xVal == 0 && yVal == 0) { // Если позиция была указана 0, 0 то по окончанию обновить стартовую позицию
         stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0);
-        indicator(0, true);
-        indicator(1, true);
-        buzzer.tone(255, 500); // Пищим
+        indicator(0, true); indicator(1, true);
+        //buzzer.tone(255, 500); // Пищим
       }
     }
   }
 }
 
+unsigned long prevMillis = 0; // stores last time cam was updated
+
+// Считываем данные с камеры
 void camRead() {
   while (true) {
     uint8_t n = trackingCam.readBlobs(5); // read data about first 5 blobs
@@ -253,7 +271,7 @@ void camRead() {
       Serial.print(trackingCam.blob[i].cx, DEC);
       Serial.print(" ");
       Serial.print(trackingCam.blob[i].cy, DEC);
-      Serial.print(" ");
+      /*Serial.print(" ");
       Serial.print(trackingCam.blob[i].area, DEC);
       Serial.print(" ");
       Serial.print(trackingCam.blob[i].left, DEC);
@@ -262,12 +280,12 @@ void camRead() {
       Serial.print(" ");
       Serial.print(trackingCam.blob[i].top, DEC);
       Serial.print(" ");
-      Serial.print(trackingCam.blob[i].bottom, DEC);
+      Serial.print(trackingCam.blob[i].bottom, DEC);*/
       Serial.println(" ");
     }
   
     // wait for the next frame
-    while(millis() - previousMillis < 33) {};
-    previousMillis = millis();
+    while(millis() - prevMillis < 33) {};
+    prevMillis = millis();
   }
 }
