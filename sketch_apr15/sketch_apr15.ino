@@ -126,7 +126,7 @@ void setup() {
   //delay(5000);
   buzzer.noTone();
   led.setNumber(RGB_LED_NUM); // Колпчество светодиодов в ленте
-  for (int i = 0; i < RGB_LED_NUM; i++) indicator(i, false); // Выключаем все светодиоды
+  for (int i = 0; i < RGB_LED_NUM; i++) indicator(i, false); // Выключаем все светодиодыs
 }
 
 void loop() {
