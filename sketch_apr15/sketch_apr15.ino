@@ -19,14 +19,8 @@
 #define LIMIT_SWITCH_X_START_PORT PORT_3 // Порт ближних концевиков к моторам
 #define LIMIT_SWITCH_X_START_SLOT SLOT_1 // Слот ближних концевиков к моторам
 
-#define LIMIT_SWITCH_X_END_PORT 0 // Порт дальних концевиков от моторов
-#define LIMIT_SWITCH_X_END_SLOT 0 // Слот дальних концевиков от моторов
-
 #define LIMIT_SWITCH_Y_START_PORT PORT_3 // Порт концевика для коретки со стороны мотора X
 #define LIMIT_SWITCH_Y_START_SLOT SLOT_2 // Слот концевика для коретки со стороны мотора X
-
-#define LIMIT_SWITCH_Y_END_PORT 0 // Порт концевика для коретки со стороны мотора Y
-#define LIMIT_SWITCH_Y_END_SLOT 0 // Слот концевика для коретки со стороны мотора Y
 
 // Серво инструмента
 #define SERVO_Z_PIN A2 // Порт серво для перемещения по Z инструмента
@@ -80,7 +74,7 @@ float x, y, lx, ly;
 // 30 - синий куб с выемкой, 31 - зелёный с выемкой, 32 - красный с выемкой
 
 // Как нужно скомплектовать коробку
-const short boxCompletataSolve[3][3] = {
+const int boxCompletataSolve[3][3] = {
   {10, 11, 12},
   {20, 21, 22},
   {30, 31, 32}
@@ -93,22 +87,25 @@ int storage4[3] = {-1, -1, -1};
 
 const int cellsPosX[5] = {10, 35, 70, 100, 135};
 const int cellsPosY[5] = {140, 105, 75, 45, 10};
-/*
-/*const int cellsPosX[5][5] = { // Переменые для хранения фигур после определения камерой по X
-  {-1, 35, 70, 100, -1},
-  {10, 40, 75, 105, 135},
-  {10, 40, 70, 105, 135},
-  {10, 40, 70, 100, 130},
-  {-1, 40, 70, 100, -1}
-}; // Крайние пункты должны быть -1*/
-/*
-const int cellsPosY[5][5] = { // Переменые для хранения фигур после определения камерой по Y
-  {-1, 140, 140, 140, -1},
-  {105, 105, 105, 105, 105},
-  {75, 75, 75, 75, 75},
-  {45, 45, 45, 45, 45},
-  {-1, 10, 10, 10, -1}
-}; // Крайние пункты должны быть -1*/
+
+#define R_BALL_TYPE 0
+#define B_BALL_TYPE 1
+#define G_BALL_TYPE -1
+
+#define R_POS 3 // Радиус координаты позиции, в котором можно найти фигуры
+
+// Координаты хранилищ
+const int xStorage1[3] = {101, 136, 172}; // Верхнее хранилище
+const int yStorage1[3] = {52, 51, 52};
+
+const int xStorage2[3] = {67, 65, 66}; // Левое
+const int yStorage2[3] = {87, 122, 156};
+
+const int xStorage3[3] = {100, 170, 206}; // Нижнее
+const int yStorage3[3] = {191, 192, 87};
+
+const int xStorage4[3] = {206, 206, 206}; // Правое
+const int yStorage4[3] = {87, 123, 158};
 
 // ИНФА
 //http://forum.amperka.ru/threads/%D0%91%D0%B8%D0%B1%D0%BB%D0%B8%D0%BE%D1%82%D0%B5%D0%BA%D0%B0-accelstepper.11388/
@@ -120,11 +117,12 @@ const int cellsPosY[5][5] = { // Переменые для хранения фи
 
 void setup() {
   Serial.begin(115200);
+  Serial.setTimeout(5);
   stepperX.setMaxSpeed(STEPPERS_MAX_SPEED); stepperY.setMaxSpeed(STEPPERS_MAX_SPEED); // Установка максимальной скорости (оборотов в минуту). При движении шаговый двигатель будет ускоряться до этой максимальной скорости и замедляться при подходе к концу движения
   stepperX.setAcceleration(STEPPERS_ACCEL); stepperY.setAcceleration(STEPPERS_ACCEL); // Установка ускорения, в шагах в секунду за секунду
-  //servoZ.attach(SERVO_Z_PIN);
-  //servoZ.write(139); // 130, 0
-  
+  servoZ.attach(SERVO_Z_PIN); // Подключаем серво Z
+  servoTool.attach(SERVO_TOOL_PIN); // Подключаем серво инструмента
+  controlZ(139); // 130, 0
   buzzer.noTone();
   led.setNumber(RGB_LED_NUM); // Колпчество светодиодов в ленте
   for (int i = 0; i < RGB_LED_NUM; i++) indicator(i, false); // Выключаем все светодиодыs
@@ -133,8 +131,8 @@ void setup() {
 }
 
 void loop() {
-  //camRead();
   searchStartPos(); // Вернуться на базу и установить 0-е позиции
+  //searchFromCamObj();
   manualControl(2); // Ручное управление
   //mySolve();
   while(true) { delay(100); } // Конец выполнения
@@ -213,7 +211,7 @@ void controlTool() {
 
 // Управление из Serial
 void manualControl(int type) {
-  int* pos = IK_CoreXY(0, 0);
+  int* motPos = new int[2]; //IK_CoreXY(0, 0);
   while (true) {
     String command = Serial.readStringUntil('\n'); // Считываем из Serial строку до символа переноса на новую строку
     command.trim(); // Чистим символы
@@ -227,16 +225,16 @@ void manualControl(int type) {
       Serial.print("xVal: "); Serial.print(xVal); Serial.print(", "); Serial.print("yVal: "); Serial.println(yVal);
       if (type == 1) {
         if (xVal <= MAX_X_DIST_MM && xVal >= 0 && yVal <= MAX_Y_DIST_MM && yVal >= 0) {
-          pos = IK_CoreXY(xVal, yVal);
+          motPos = IK_CoreXY(xVal, yVal);
         }
       } else if (type == 2) {
-        pos = IK_CoreXY(cellsPosX[xVal], cellsPosY[yVal]);
+        motPos = IK_CoreXY(cellsPosX[xVal], cellsPosY[yVal]);
         Serial.print("cellsPosX: "); Serial.print(cellsPosX[xVal]); Serial.print(", "); Serial.print("cellsPosY: "); Serial.println(cellsPosY[yVal]);
       }
-      Serial.print("pos0: "); Serial.print(pos[0]); Serial.print(", "); Serial.print("pos1: "); Serial.println(pos[1]);
+      Serial.print("motPos0: "); Serial.print(motPos[0]); Serial.print(", "); Serial.print("motPos1: "); Serial.println(motPos[1]);
       // Перемещаем
       while (true) { // Перемещаем моторы в позицию
-        stepperX.moveTo(pos[0]); stepperY.moveTo(pos[1]);
+        stepperX.moveTo(motPos[0]); stepperY.moveTo(motPos[1]);
         stepperX.run(); stepperY.run();
         // Включаем/выключаем светодиоды нулевого положения
         if (yStartlimitSwitch.touched()) indicator(0, true);
@@ -248,7 +246,8 @@ void manualControl(int type) {
       }
       if (xStartlimitSwitch.touched() && yStartlimitSwitch.touched()) { // Если позиция была указана 0, 0 то по окончанию обновить стартовую позицию
         stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0);
-        indicator(0, true); indicator(1, true);
+        indicator(0, true);
+        indicator(1, true);
       }
     }
   }
@@ -256,35 +255,29 @@ void manualControl(int type) {
 
 unsigned long prevMillis = 0; // stores last time cam was updated
 
-// Считываем данные с камеры
-void camRead() {
+// Считываем данные с камеры и записываем
+void searchFromCamObj() {
   while (true) {
-    uint8_t n = trackingCam.readBlobs(5); // read data about first 5 blobs
+    uint8_t n = trackingCam.readBlobs(3); // Считать первые 3 блобсы
     Serial.println("All blobs");
-    Serial.println(n); // print numbers of blobs
-    for(int i = 0; i < n; i++) // print information about all blobs
-    {
-      Serial.print(trackingCam.blob[i].type, DEC);
+    Serial.println(n); // Сообщить о количестве найденных блобсах
+    for(int i = 0; i < n; i++) {
+      int objType = trackingCam.blob[i].type;
+      int objCX = trackingCam.blob[i].cx;
+      int objCY = trackingCam.blob[i].cy;
+      Serial.print(objType, DEC);
       Serial.print(" ");
-      Serial.print(trackingCam.blob[i].dummy, DEC);
+      Serial.print(objCX, DEC);
       Serial.print(" ");
-      Serial.print(trackingCam.blob[i].cx, DEC);
-      Serial.print(" ");
-      Serial.print(trackingCam.blob[i].cy, DEC);
-      /*Serial.print(" ");
-      Serial.print(trackingCam.blob[i].area, DEC);
-      Serial.print(" ");
-      Serial.print(trackingCam.blob[i].left, DEC);
-      Serial.print(" ");
-      Serial.print(trackingCam.blob[i].right, DEC);
-      Serial.print(" ");
-      Serial.print(trackingCam.blob[i].top, DEC);
-      Serial.print(" ");
-      Serial.print(trackingCam.blob[i].bottom, DEC);*/
+      Serial.print(objCY, DEC);
       Serial.println(" ");
+
+      if (pow(objCX - x0, 2) + pow(objCY - y0, 2) <= pow(R_POS, 2)) {
+        // Записываем какой объект в координате
+      }
     }
   
-    // wait for the next frame
+    // Ждем следующий кадр
     while(millis() - prevMillis < 33) {};
     prevMillis = millis();
   }
