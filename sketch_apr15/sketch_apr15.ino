@@ -94,17 +94,17 @@ const int cellsPosY[5] = {140, 105, 75, 45, 10};
 #define R_POS 3 // Радиус координаты позиции, в котором можно найти фигуры
 
 // Координаты хранилищ
-const int xStorage1[3] = {101, 136, 172}; // Верхнее хранилище
-const int yStorage1[3] = {52, 51, 52};
+const int xCamStorage1[3] = {101, 136, 172}; // Верхнее хранилище
+const int yCamStorage1[3] = {52, 51, 52};
 
-const int xStorage2[3] = {67, 65, 66}; // Левое
-const int yStorage2[3] = {87, 122, 156};
+const int xCamStorage2[3] = {67, 65, 66}; // Левое
+const int yCamStorage2[3] = {87, 122, 156};
 
-const int xStorage3[3] = {100, 135, 170}; // Нижнее
-const int yStorage3[3] = {191, 192, 87};
+const int xCamStorage3[3] = {100, 135, 170}; // Нижнее
+const int yCamStorage3[3] = {191, 192, 87};
 
-const int xStorage4[3] = {206, 206, 206}; // Правое
-const int yStorage4[3] = {87, 123, 158};
+const int xCamStorage4[3] = {206, 206, 206}; // Правое
+const int yCamStorage4[3] = {87, 123, 158};
 
 // ИНФА
 //http://forum.amperka.ru/threads/%D0%91%D0%B8%D0%B1%D0%BB%D0%B8%D0%BE%D1%82%D0%B5%D0%BA%D0%B0-accelstepper.11388/
