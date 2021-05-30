@@ -51,7 +51,6 @@
 
 MeLimitSwitch xStartlimitSwitch(LIMIT_SWITCH_X_START_PORT, LIMIT_SWITCH_X_START_SLOT);
 MeLimitSwitch yStartlimitSwitch(LIMIT_SWITCH_Y_START_PORT, LIMIT_SWITCH_Y_START_SLOT);
-//MePort xStartlimitSwitch(LIMIT_SWITCH_X_START); // !Концевик не работает на 8, 7 в слоте 1, а только в слоте 2
 
 MeBuzzer buzzer(BUZZER_PORT, BUZZER_SLOT); // Пьезопищалка
 
@@ -63,11 +62,11 @@ AccelStepper stepperY(AccelStepper::DRIVER, STEPPER_Y_STP_PIN, STEPPER_Y_DIR_PIN
 
 Servo servoZ, servoTool; // Серво инструмента
 
-GTimer_ms myTimer1(10); // Таймер
-
 TrackingCamI2C trackingCam; // Камера
 
-float x, y, lx, ly;
+GTimer_ms myTimer1(10); // Таймер
+
+float x, y, lx, ly; // Глобальные переменные координат для работы с перемещением по X, Y
 
 // 10 - синий шар, 11 - зелёный, 12 - красный шар
 // 20 - синий куб, 21 - зелёный, 22 - красный куб
