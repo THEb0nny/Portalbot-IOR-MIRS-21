@@ -7,13 +7,12 @@
  * 5-TX   O O|  6-RX      5V   -  +5
  * 7-SCK |O O|  8-SNS     Gnd  -  Gnd
  * 9-IC0 |O O| 10-ID1     
- */ 
+*/
 
 #include <SoftwareSerial.h>
 #include <Arduino.h>
 #include <MeOrion.h>
 #include <AccelStepper.h>
-#include <math.h>
 #include "TrackingCamI2C.h"
 #include "GyverTimer.h"
 
@@ -30,15 +29,15 @@
 #define LIMIT_SWITCH_Y_END_SLOT 0 // Слот концевика для коретки со стороны мотора Y
 
 // Серво инструмента
-#define SERVO_Z_PIN 8 // Порт серво для перемещения по Z инструмента
-#define SERVO_TOOL_PIN 0 // Дополнительный серво по Z у инструмента
+#define SERVO_Z_PIN A2 // Порт серво для перемещения по Z инструмента
+#define SERVO_TOOL_PIN A3 // Дополнительный серво по Z у инструмента
 
 #define MAX_X_DIST_MM 140 // Максимальная дистанция по X для перемещения в мм
 #define MAX_Y_DIST_MM 150 // Максимальная дистанция по Y для перемещения в мм
 #define DIST_TO_CENTER_CARRIAGE 30 // Расстояние до центра корретки в мм
 
 #define BUZZER_PORT PORT_4 // Порт пьезопищалки
-#define BUZZER_SLOT SLOT_2 // Слот пьезопищалки, работает только во втором
+#define BUZZER_SLOT SLOT_1 // Слот пьезопищалки, работает только во втором
 
 #define RGB_PORT PORT_4 // Порт RGB ленты
 #define RGB_SLOT SLOT_2 // Слот RGB ленты, работает только во втором
@@ -74,35 +73,42 @@ GTimer_ms myTimer1(10); // Таймер
 
 TrackingCamI2C trackingCam; // Камера
 
-// Как нужно скомплектовать коробку 
-const String boxCompletateSolve[3][3] = {
-  {"RC", "BC", "GC"},
-  {"RCC", "BCC", "GCC"},
-  {"RB", "BB", "GB"}
-}; // RC - красный куб, RCC - красный куб с выемкой, RB - красный шар
+float x, y, lx, ly;
 
-String storage[4][3] = { // Хранилище
-  {"N", "N", "N"}, // Выерхний
-  {"N", "N", "N"}, // Левый
-  {"N", "N", "N"}, // Правый
-  {"N", "N", "N"} // Нижний
+// 10 - синий шар, 11 - зелёный, 12 - красный шар
+// 20 - синий куб, 21 - зелёный, 22 - красный куб
+// 30 - синий куб с выемкой, 31 - зелёный с выемкой, 32 - красный с выемкой
+
+// Как нужно скомплектовать коробку
+const short boxCompletataSolve[3][3] = {
+  {10, 11, 12},
+  {20, 21, 22},
+  {30, 31, 32}
 };
 
-const int cellsPosX[5][5] = { // Переменые для хранения фигур после определения камерой по X
+int storage1[3] = {-1, -1, -1};
+int storage2[3] = {-1, -1, -1};
+int storage3[3] = {-1, -1, -1};
+int storage4[3] = {-1, -1, -1};
+
+const int cellsPosX[5] = {10, 35, 70, 100, 135};
+const int cellsPosY[5] = {140, 105, 75, 45, 10};
+/*
+/*const int cellsPosX[5][5] = { // Переменые для хранения фигур после определения камерой по X
   {-1, 35, 70, 100, -1},
   {10, 40, 75, 105, 135},
   {10, 40, 70, 105, 135},
   {10, 40, 70, 100, 130},
   {-1, 40, 70, 100, -1}
-}; // Крайние пункты должны быть -1
-
+}; // Крайние пункты должны быть -1*/
+/*
 const int cellsPosY[5][5] = { // Переменые для хранения фигур после определения камерой по Y
   {-1, 140, 140, 140, -1},
   {105, 105, 105, 105, 105},
   {75, 75, 75, 75, 75},
   {45, 45, 45, 45, 45},
   {-1, 10, 10, 10, -1}
-}; // Крайние пункты должны быть -1
+}; // Крайние пункты должны быть -1*/
 
 // ИНФА
 //http://forum.amperka.ru/threads/%D0%91%D0%B8%D0%B1%D0%BB%D0%B8%D0%BE%D1%82%D0%B5%D0%BA%D0%B0-accelstepper.11388/
@@ -113,23 +119,21 @@ const int cellsPosY[5][5] = { // Переменые для хранения фи
 //http://wiki.neobot.ru/index.php?title=%D0%A1%D0%B2%D0%B5%D1%82%D0%BE%D0%B4%D0%B8%D0%BE%D0%B4%D0%BD%D0%B0%D1%8F_%D0%BB%D0%B5%D0%BD%D1%82%D0%B0/LED_RGB_Strip-Addressable,_Sealed
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
   stepperX.setMaxSpeed(STEPPERS_MAX_SPEED); stepperY.setMaxSpeed(STEPPERS_MAX_SPEED); // Установка максимальной скорости (оборотов в минуту). При движении шаговый двигатель будет ускоряться до этой максимальной скорости и замедляться при подходе к концу движения
   stepperX.setAcceleration(STEPPERS_ACCEL); stepperY.setAcceleration(STEPPERS_ACCEL); // Установка ускорения, в шагах в секунду за секунду
-  servoZ.attach(SERVO_Z_PIN);
-  servoZ.write(0);
-  /* TrackingCamI2C::init(uint8_t cam_id, uint32_t speed);
-   *   cam_id - 1..127, default 51
-   *   speed - 100000/400000, cam enables auto detection of master clock 
-   */
-  //trackingCam.init(51, 100000);
-  //delay(5000);
+  //servoZ.attach(SERVO_Z_PIN);
+  //servoZ.write(139); // 130, 0
+  
   buzzer.noTone();
   led.setNumber(RGB_LED_NUM); // Колпчество светодиодов в ленте
   for (int i = 0; i < RGB_LED_NUM; i++) indicator(i, false); // Выключаем все светодиодыs
+  trackingCam.init(51, 100000); //cam_id - 1..127, default 51; speed - 100000/400000, cam enables auto detection of master clock
+  //delay(5000);
 }
 
 void loop() {
+  //camRead();
   searchStartPos(); // Вернуться на базу и установить 0-е позиции
   manualControl(2); // Ручное управление
   //mySolve();
@@ -141,6 +145,7 @@ void mySolve() {
   if (myTimer1.isReady()) {
     
   }
+  buzzer.tone(255, 2000); // Пищим о завершении
   Serial.println();
 }
 
@@ -150,7 +155,7 @@ void indicator(short i, bool state) {
   led.show();
 }
 
-void searchStartPos() {
+void searchStartPos() { // Возвращение (поиск) на домашнюю позициию
   do {
     while (!yStartlimitSwitch.touched()) { // По y сместиться в крайнюю позицию
       stepperX.setSpeed(STEPPERS_MAX_SPEED); stepperY.setSpeed(STEPPERS_MAX_SPEED);
@@ -176,8 +181,6 @@ void searchStartPos() {
   //buzzer.tone(255, 500); // Пищим
 }
 
-float x, y, lx, ly;
-
 // Прямая задача кинематики
 int* FK_CoreXY(float lx, float ly) { // void FK_CoreXY(long l1, long l2, float &x, float &y)
   lx *= DIST_MM_PER_STEP_X;
@@ -191,7 +194,7 @@ int* FK_CoreXY(float lx, float ly) { // void FK_CoreXY(long l1, long l2, float &
 }
 
 // Обратная задача кинематики
-int* IK_CoreXY(float x, float y) { // void IK_CoreXY(float x, float y, long &l1, long &l2)
+int* IK_CoreXY(float x, float y) {
   lx = floor((x + y) / DIST_MM_PER_STEP_X) * -1;
   ly = floor((x - y) / DIST_MM_PER_STEP_Y) * -1;
   int *return_array = new int[2];
@@ -217,23 +220,21 @@ void manualControl(int type) {
     if (command.length() > 0) { // Если есть доступные данные
       char strBuffer[11] = {};
       command.toCharArray(strBuffer, 11);
+
       // Считываем x и y разделённых пробелом
       int xVal = atoi(strtok(strBuffer, " "));
       int yVal = atoi(strtok(NULL, " "));
       Serial.print("xVal: "); Serial.print(xVal); Serial.print(", "); Serial.print("yVal: "); Serial.println(yVal);
-      
       if (type == 1) {
         if (xVal <= MAX_X_DIST_MM && xVal >= 0 && yVal <= MAX_Y_DIST_MM && yVal >= 0) {
           pos = IK_CoreXY(xVal, yVal);
-          Serial.print("x: "); Serial.print(pos[0]); Serial.print(", "); Serial.print("y: "); Serial.println(pos[1]);
         }
-      } else if (type == 2) {  
-        if (xVal >= 0 && xVal <= 4 && yVal >= 0 && yVal <= 4 || xVal != 0 && yVal != 0 || xVal != 4 && yVal != 0 || xVal != 0 && yVal != 4 || xVal != 4 && yVal != 4) {
-          pos = IK_CoreXY(cellsPosX[xVal][yVal], cellsPosY[xVal][yVal]);
-          Serial.print("iCell: "); Serial.print(pos[0]); Serial.print(", "); Serial.print("jCell: "); Serial.println(pos[1]);
-        }
+      } else if (type == 2) {
+        pos = IK_CoreXY(cellsPosX[xVal], cellsPosY[yVal]);
+        Serial.print("cellsPosX: "); Serial.print(cellsPosX[xVal]); Serial.print(", "); Serial.print("cellsPosY: "); Serial.println(cellsPosY[yVal]);
       }
-      
+      Serial.print("pos0: "); Serial.print(pos[0]); Serial.print(", "); Serial.print("pos1: "); Serial.println(pos[1]);
+      // Перемещаем
       while (true) { // Перемещаем моторы в позицию
         stepperX.moveTo(pos[0]); stepperY.moveTo(pos[1]);
         stepperX.run(); stepperY.run();
@@ -245,10 +246,9 @@ void manualControl(int type) {
         ////
         if (!stepperX.isRunning() && !stepperY.isRunning()) break; // Мотор остановился выполнив перемещение
       }
-      if (xVal == 0 && yVal == 0) { // Если позиция была указана 0, 0 то по окончанию обновить стартовую позицию
+      if (xStartlimitSwitch.touched() && yStartlimitSwitch.touched()) { // Если позиция была указана 0, 0 то по окончанию обновить стартовую позицию
         stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0);
         indicator(0, true); indicator(1, true);
-        //buzzer.tone(255, 500); // Пищим
       }
     }
   }
