@@ -100,7 +100,7 @@ const int yStorage1[3] = {52, 51, 52};
 const int xStorage2[3] = {67, 65, 66}; // Левое
 const int yStorage2[3] = {87, 122, 156};
 
-const int xStorage3[3] = {100, 170, 206}; // Нижнее
+const int xStorage3[3] = {100, 135, 170}; // Нижнее
 const int yStorage3[3] = {191, 192, 87};
 
 const int xStorage4[3] = {206, 206, 206}; // Правое
