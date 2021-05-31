@@ -7,7 +7,7 @@
  * 5-TX   O O|  6-RX      5V   -  +5
  * 7-SCK |O O|  8-SNS     Gnd  -  Gnd
  * 9-IC0 |O O| 10-ID1     
-*/
+**/
 
 #include <SoftwareSerial.h>
 #include <Arduino.h>
@@ -59,7 +59,7 @@
 #define B_CUBE_WITH_RECESS_TYPE -1
 #define G_CUBE_WITH_RECESS_TYPE -1
 
-#define R_POS 3 // Радиус координаты позиции, в котором можно найти фигуры
+#define R_ZONE_POS 3 // Радиус координаты позиции, в котором можно найти фигуры
 
 MeLimitSwitch xStartlimitSwitch(LIMIT_SWITCH_X_START_PORT, LIMIT_SWITCH_X_START_SLOT);
 MeLimitSwitch yStartlimitSwitch(LIMIT_SWITCH_Y_START_PORT, LIMIT_SWITCH_Y_START_SLOT);
@@ -94,17 +94,8 @@ const int cellsPosX[5] = {10, 35, 70, 100, 135};
 const int cellsPosY[5] = {140, 105, 75, 45, 10};
 
 // Координаты хранилищ
-const int xCamStorage1[3] = {101, 136, 172}; // Верхнее хранилище
-const int yCamStorage1[3] = {52, 51, 52};
-
-const int xCamStorage2[3] = {67, 65, 66}; // Правое
-const int yCamStorage2[3] = {87, 122, 156};
-
-const int xCamStorage3[3] = {100, 135, 170}; // Нижнее
-const int yCamStorage3[3] = {191, 192, 87};
-
-const int xCamStorage4[3] = {206, 206, 206}; // Левое
-const int yCamStorage4[3] = {87, 123, 158};
+const int storagesCellsCamPosX[5] = {65, 101, 136, 172, 206};
+const int storagesCellsCamPosY[5] = {52, 87, 122, 157, 191};
 
 float x, y, lx, ly; // Глобальные переменные координат для работы с перемещением по X, Y
 
@@ -147,6 +138,42 @@ void mySolve() {
   ////
   buzzer.tone(255, 2000); // Пищим о завершении
   Serial.println();
+}
+
+unsigned long prevMillis = 0; // stores last time cam was updated
+
+// Считываем данные с камеры и записываем
+void searchFromCamObj() {
+  while (true) {
+    uint8_t n = trackingCam.readBlobs(3); // Считать первые 3 блобсы
+    Serial.println("All blobs");
+    Serial.println(n); // Сообщить о количестве найденных блобсах
+    for(int i = 0; i < n; i++) {
+      int objType = trackingCam.blob[i].type;
+      int objCX = trackingCam.blob[i].cx;
+      int objCY = trackingCam.blob[i].cy;
+      Serial.print(objType, DEC);
+      Serial.print(" ");
+      Serial.print(objCX, DEC);
+      Serial.print(" ");
+      Serial.print(objCY, DEC);
+      Serial.println(" ");
+      for (int i = 0; i < sizeof(storagesCellsCamPosX); i++) {
+        for (int j = 0; j < sizeof(storagesCellsCamPosY); j++) {
+          
+        }
+      }
+      int cellCamX = storagesCellsCamPosX[0];
+      int cellCamY = storagesCellsCamPosY[0];
+      if (pow(objCX - cellCamX, 2) + pow(objCY - cellCamY, 2) <= pow(R_ZONE_POS, 2)) {
+        // Записываем какой объект в координате
+      }
+    }
+  
+    // Ждем следующий кадр
+    while(millis() - prevMillis < 33) {};
+    prevMillis = millis();
+  }
 }
 
 void indicator(short i, bool state) {
@@ -251,35 +278,5 @@ void manualControl(int type) {
         indicator(0, true); indicator(1, true);
       }
     }
-  }
-}
-
-unsigned long prevMillis = 0; // stores last time cam was updated
-
-// Считываем данные с камеры и записываем
-void searchFromCamObj() {
-  while (true) {
-    uint8_t n = trackingCam.readBlobs(3); // Считать первые 3 блобсы
-    Serial.println("All blobs");
-    Serial.println(n); // Сообщить о количестве найденных блобсах
-    for(int i = 0; i < n; i++) {
-      int objType = trackingCam.blob[i].type;
-      int objCX = trackingCam.blob[i].cx;
-      int objCY = trackingCam.blob[i].cy;
-      Serial.print(objType, DEC);
-      Serial.print(" ");
-      Serial.print(objCX, DEC);
-      Serial.print(" ");
-      Serial.print(objCY, DEC);
-      Serial.println(" ");
-
-      if (pow(objCX - x0, 2) + pow(objCY - y0, 2) <= pow(R_POS, 2)) {
-        // Записываем какой объект в координате
-      }
-    }
-  
-    // Ждем следующий кадр
-    while(millis() - prevMillis < 33) {};
-    prevMillis = millis();
   }
 }
