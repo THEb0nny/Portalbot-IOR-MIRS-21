@@ -16,19 +16,18 @@
 #include "TrackingCamI2C.h"
 #include "GyverTimer.h"
 
-#define LIMIT_SWITCH_X_START_PORT PORT_3 // Порт ближних концевиков к моторам
-#define LIMIT_SWITCH_X_START_SLOT SLOT_1 // Слот ближних концевиков к моторам
+#define LIMIT_SWITCH_X_START_PORT PORT_3 // Порт ближних концевиков к моторам по Y
+#define LIMIT_SWITCH_X_START_SLOT SLOT_1 // Слот ближних концевиков к моторам по Y
 
 #define LIMIT_SWITCH_Y_START_PORT PORT_3 // Порт концевика для коретки со стороны мотора X
 #define LIMIT_SWITCH_Y_START_SLOT SLOT_2 // Слот концевика для коретки со стороны мотора X
 
-// Серво инструмента
+// Серво Z и инструмента
 #define SERVO_Z_PIN A2 // Порт серво для перемещения по Z инструмента
-#define SERVO_TOOL_PIN A3 // Дополнительный серво по Z у инструмента
+#define SERVO_TOOL_PIN A3 // Порт серво инструмента
 
 #define MAX_X_DIST_MM 140 // Максимальная дистанция по X для перемещения в мм
 #define MAX_Y_DIST_MM 150 // Максимальная дистанция по Y для перемещения в мм
-#define DIST_TO_CENTER_CARRIAGE 30 // Расстояние до центра корретки в мм
 
 #define BUZZER_PORT PORT_4 // Порт пьезопищалки
 #define BUZZER_SLOT SLOT_1 // Слот пьезопищалки, работает только во втором
@@ -49,6 +48,19 @@
 #define DIST_MM_PER_STEP_X 0.04 // Дистанция в мм за прохождение 1 шага мотора X
 #define DIST_MM_PER_STEP_Y 0.04 // Дистанция в мм за прохождение 1 шага мотора X
 
+// Номера типов фигур
+#define R_BALL_TYPE 0
+#define B_BALL_TYPE 1
+#define G_BALL_TYPE 2
+#define R_CUBE_TYPE -1
+#define B_CUBE_TYPE -1
+#define G_CUBE_TYPE -1
+#define R_CUBE_WITH_RECESS_TYPE -1
+#define B_CUBE_WITH_RECESS_TYPE -1
+#define G_CUBE_WITH_RECESS_TYPE -1
+
+#define R_POS 3 // Радиус координаты позиции, в котором можно найти фигуры
+
 MeLimitSwitch xStartlimitSwitch(LIMIT_SWITCH_X_START_PORT, LIMIT_SWITCH_X_START_SLOT);
 MeLimitSwitch yStartlimitSwitch(LIMIT_SWITCH_Y_START_PORT, LIMIT_SWITCH_Y_START_SLOT);
 
@@ -66,17 +78,11 @@ TrackingCamI2C trackingCam; // Камера
 
 GTimer_ms myTimer1(10); // Таймер
 
-float x, y, lx, ly; // Глобальные переменные координат для работы с перемещением по X, Y
-
-// 10 - синий шар, 11 - зелёный, 12 - красный шар
-// 20 - синий куб, 21 - зелёный, 22 - красный куб
-// 30 - синий куб с выемкой, 31 - зелёный с выемкой, 32 - красный с выемкой
-
 // Как нужно скомплектовать коробку
 const int boxCompletataSolve[3][3] = {
-  {10, 11, 12},
-  {20, 21, 22},
-  {30, 31, 32}
+  {B_BALL_TYPE, G_BALL_TYPE, R_BALL_TYPE},
+  {B_CUBE_TYPE, G_CUBE_TYPE, R_CUBE_TYPE},
+  {B_CUBE_WITH_RECESS_TYPE, G_CUBE_WITH_RECESS_TYPE, R_CUBE_WITH_RECESS_TYPE}
 };
 
 int storage1[3] = {-1, -1, -1};
@@ -87,24 +93,20 @@ int storage4[3] = {-1, -1, -1};
 const int cellsPosX[5] = {10, 35, 70, 100, 135};
 const int cellsPosY[5] = {140, 105, 75, 45, 10};
 
-#define R_BALL_TYPE 0
-#define B_BALL_TYPE 1
-#define G_BALL_TYPE -1
-
-#define R_POS 3 // Радиус координаты позиции, в котором можно найти фигуры
-
 // Координаты хранилищ
 const int xCamStorage1[3] = {101, 136, 172}; // Верхнее хранилище
 const int yCamStorage1[3] = {52, 51, 52};
 
-const int xCamStorage2[3] = {67, 65, 66}; // Левое
+const int xCamStorage2[3] = {67, 65, 66}; // Правое
 const int yCamStorage2[3] = {87, 122, 156};
 
 const int xCamStorage3[3] = {100, 135, 170}; // Нижнее
 const int yCamStorage3[3] = {191, 192, 87};
 
-const int xCamStorage4[3] = {206, 206, 206}; // Правое
+const int xCamStorage4[3] = {206, 206, 206}; // Левое
 const int yCamStorage4[3] = {87, 123, 158};
+
+float x, y, lx, ly; // Глобальные переменные координат для работы с перемещением по X, Y
 
 // ИНФА
 //http://forum.amperka.ru/threads/%D0%91%D0%B8%D0%B1%D0%BB%D0%B8%D0%BE%D1%82%D0%B5%D0%BA%D0%B0-accelstepper.11388/
@@ -125,14 +127,14 @@ void setup() {
   buzzer.noTone();
   led.setNumber(RGB_LED_NUM); // Колпчество светодиодов в ленте
   for (int i = 0; i < RGB_LED_NUM; i++) indicator(i, false); // Выключаем все светодиодыs
-  trackingCam.init(51, 100000); //cam_id - 1..127, default 51; speed - 100000/400000, cam enables auto detection of master clock
+  trackingCam.init(51, 100000); // cam_id - 1..127, default 51; speed - 100000/400000, cam enables auto detection of master clock
   //delay(5000);
 }
 
 void loop() {
   searchStartPos(); // Вернуться на базу и установить 0-е позиции
+  //manualControl(2); // Ручное управление
   //searchFromCamObj();
-  manualControl(2); // Ручное управление
   //mySolve();
   while(true) { delay(100); } // Конец выполнения
 }
@@ -142,6 +144,7 @@ void mySolve() {
   if (myTimer1.isReady()) {
     
   }
+  ////
   buzzer.tone(255, 2000); // Пищим о завершении
   Serial.println();
 }
@@ -167,7 +170,7 @@ void searchStartPos() { // Возвращение (поиск) на домашн
     }
     if (xStartlimitSwitch.touched()) indicator(1, true); // Включаем светодиоды нулевого положения
     else indicator(1, false); // Иначе выключаем
-  } while (!yStartlimitSwitch.touched() && !xStartlimitSwitch.touched()); // Пока концевики не сработали
+  } while (!yStartlimitSwitch.touched() && !xStartlimitSwitch.touched()); // Пока 2 концевика не сработали
   
   // Включаем светодиоды нулевого положения
   if (yStartlimitSwitch.touched()) indicator(0, true);
@@ -178,7 +181,7 @@ void searchStartPos() { // Возвращение (поиск) на домашн
   //buzzer.tone(255, 500); // Пищим
 }
 
-// Прямая задача кинематики
+// Прямая задача кинематики для CoreXY
 int* FK_CoreXY(float lx, float ly) { // void FK_CoreXY(long l1, long l2, float &x, float &y)
   lx *= DIST_MM_PER_STEP_X;
   ly *= DIST_MM_PER_STEP_Y;
@@ -190,7 +193,7 @@ int* FK_CoreXY(float lx, float ly) { // void FK_CoreXY(long l1, long l2, float &
   return return_array;
 }
 
-// Обратная задача кинематики
+// Обратная задача кинематики для CoreXY
 int* IK_CoreXY(float x, float y) {
   lx = floor((x + y) / DIST_MM_PER_STEP_X) * -1;
   ly = floor((x - y) / DIST_MM_PER_STEP_Y) * -1;
@@ -201,11 +204,11 @@ int* IK_CoreXY(float x, float y) {
 }
 
 void controlZ(short pos) {
-  //servoZ.write(pos);
+  servoZ.write(pos);
 }
 
-void controlTool() {
-  
+void controlTool(short pos) {
+  servoTool.write(pos);
 }
 
 // Управление из Serial
@@ -245,8 +248,7 @@ void manualControl(int type) {
       }
       if (xStartlimitSwitch.touched() && yStartlimitSwitch.touched()) { // Если позиция была указана 0, 0 то по окончанию обновить стартовую позицию
         stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0);
-        indicator(0, true);
-        indicator(1, true);
+        indicator(0, true); indicator(1, true);
       }
     }
   }
