@@ -85,13 +85,13 @@ const int boxCompletataSolve[3][3] = {
   {B_CUBE_WITH_RECESS_TYPE, G_CUBE_WITH_RECESS_TYPE, R_CUBE_WITH_RECESS_TYPE}
 };
 
-int storage1[3] = {-1, -1, -1};
-int storage2[3] = {-1, -1, -1};
-int storage3[3] = {-1, -1, -1};
-int storage4[3] = {-1, -1, -1};
+int storage1[3] = {-1, -1, -1}; // Склад сверху
+int storage2[3] = {-1, -1, -1}; // Справа
+int storage3[3] = {-1, -1, -1}; // Снизу
+int storage4[3] = {-1, -1, -1}; // Слева
 
-const int cellsPosX[5] = {10, 35, 70, 100, 135};
-const int cellsPosY[5] = {140, 105, 75, 45, 10};
+const int cellsPosX[5] = {10, 35, 70, 100, 135}; // Координаты рядов ячеек
+const int cellsPosY[5] = {140, 105, 75, 45, 10}; // Координаты строк ячеек
 
 // Координаты хранилищ
 const int storagesCellsCamPosX[5] = {65, 101, 136, 172, 206};
@@ -159,14 +159,13 @@ void searchFromCamObj() {
       Serial.print(objCY, DEC);
       Serial.println(" ");
       for (int i = 0; i < sizeof(storagesCellsCamPosX); i++) {
+        int cellCamX = storagesCellsCamPosX[0];
         for (int j = 0; j < sizeof(storagesCellsCamPosY); j++) {
-          
+          int cellCamY = storagesCellsCamPosY[0];
+          if (pow(objCX - cellCamX, 2) + pow(objCY - cellCamY, 2) <= pow(R_ZONE_POS, 2)) {
+            // Записываем какой объект в координате
+          }
         }
-      }
-      int cellCamX = storagesCellsCamPosX[0];
-      int cellCamY = storagesCellsCamPosY[0];
-      if (pow(objCX - cellCamX, 2) + pow(objCY - cellCamY, 2) <= pow(R_ZONE_POS, 2)) {
-        // Записываем какой объект в координате
       }
     }
   
