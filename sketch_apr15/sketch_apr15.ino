@@ -48,7 +48,7 @@
 #define DIST_MM_PER_STEP_X 0.04 // Дистанция в мм за прохождение 1 шага мотора X
 #define DIST_MM_PER_STEP_Y 0.04 // Дистанция в мм за прохождение 1 шага мотора X
 
-// Номера типов фигур
+// Номера типов фигур по настройкам камеры
 #define R_BALL_TYPE 0
 #define B_BALL_TYPE 1
 #define G_BALL_TYPE 2
@@ -60,6 +60,9 @@
 #define G_CUBE_WITH_RECESS_TYPE -1
 
 #define R_ZONE_POS 3 // Радиус координаты позиции, в котором можно найти фигуры
+
+#define XY_CELLS_ARR_LEN 5 // Размер для массивов координат ячеек по X и Y
+#define MAX_TIME_TO_READ_FROM_CAM 2000 // Максимальное время для считываения с камеры
 
 MeLimitSwitch xStartlimitSwitch(LIMIT_SWITCH_X_START_PORT, LIMIT_SWITCH_X_START_SLOT);
 MeLimitSwitch yStartlimitSwitch(LIMIT_SWITCH_Y_START_PORT, LIMIT_SWITCH_Y_START_SLOT);
@@ -90,12 +93,12 @@ int storage2[3] = {-1, -1, -1}; // Справа
 int storage3[3] = {-1, -1, -1}; // Снизу
 int storage4[3] = {-1, -1, -1}; // Слева
 
-const int cellsPosX[5] = {10, 35, 70, 100, 135}; // Координаты рядов ячеек
-const int cellsPosY[5] = {140, 105, 75, 45, 10}; // Координаты строк ячеек
+const int cellsPosX[XY_CELLS_ARR_LEN] = {10, 35, 70, 100, 135}; // Координаты рядов ячеек
+const int cellsPosY[XY_CELLS_ARR_LEN] = {140, 105, 75, 45, 10}; // Координаты строк ячеек
 
 // Координаты хранилищ
-const int storagesCellsCamPosX[5] = {65, 101, 136, 172, 206};
-const int storagesCellsCamPosY[5] = {52, 87, 122, 157, 191};
+const int storagesCellsCamPosX[XY_CELLS_ARR_LEN] = {65, 101, 136, 172, 206};
+const int storagesCellsCamPosY[XY_CELLS_ARR_LEN] = {52, 87, 122, 157, 191};
 
 float x, y, lx, ly; // Глобальные переменные координат для работы с перемещением по X, Y
 
@@ -144,7 +147,7 @@ unsigned long prevMillis = 0; // stores last time cam was updated
 
 // Считываем данные с камеры и записываем
 void searchFromCamObj() {
-  while (true) {
+  do {
     uint8_t n = trackingCam.readBlobs(3); // Считать первые 3 блобсы
     Serial.println("All blobs");
     Serial.println(n); // Сообщить о количестве найденных блобсах
@@ -152,27 +155,28 @@ void searchFromCamObj() {
       int objType = trackingCam.blob[i].type;
       int objCX = trackingCam.blob[i].cx;
       int objCY = trackingCam.blob[i].cy;
-      Serial.print(objType, DEC);
-      Serial.print(" ");
-      Serial.print(objCX, DEC);
-      Serial.print(" ");
-      Serial.print(objCY, DEC);
-      Serial.println(" ");
-      for (int i = 0; i < sizeof(storagesCellsCamPosX); i++) {
-        int cellCamX = storagesCellsCamPosX[0];
-        for (int j = 0; j < sizeof(storagesCellsCamPosY); j++) {
-          int cellCamY = storagesCellsCamPosY[0];
-          if (pow(objCX - cellCamX, 2) + pow(objCY - cellCamY, 2) <= pow(R_ZONE_POS, 2)) {
-            // Записываем какой объект в координате
+      Serial.print(objType, DEC); Serial.print(" "); Serial.print(objCX, DEC); Serial.print(" "); Serial.print(objCY, DEC); Serial.println(" ");
+      for (int i = 0; i < XY_CELLS_ARR_LEN; i++) {
+        int cellCamX = storagesCellsCamPosX[i];
+        for (int j = 0; j < XY_CELLS_ARR_LEN; j++) {
+          if ((i >= 1 && j >= 1) && (i <= 3 && j <= 3) || (i == 0 && j == 0) || (i == 0 && j == 4) || (i == 4 && j == 0) || (i == 4 && j == 4)) continue; // Если смотрим координаты не хранилищ, то пропускаем шаг
+          int cellCamY = storagesCellsCamPosY[j];
+          if (pow(objCX - cellCamX, 2) + pow(objCY - cellCamY, 2) <= pow(R_ZONE_POS, 2)) { // Если объект с координатами центра попадает в область позиций
+            // Записываем какой объект в координате в массив для хранилищ
+            if (j == 0) storage1[i] = objType; // Если строка первая
+            else if (j == 4) storage3[i] = objType; // Если строка последняя
+            else { // Иначе остальные - 1 - 3
+              if (i == 0) storage4[i] = objType; // Если ряд первый - 0
+              else if (i == 4) storage2[i] = objType; // Если ряд последний - 4
+            }
           }
         }
       }
     }
-  
     // Ждем следующий кадр
     while(millis() - prevMillis < 33) {};
     prevMillis = millis();
-  }
+  } while (millis() < MAX_TIME_TO_READ_FROM_CAM); // Ждём время
 }
 
 void indicator(short i, bool state) {
