@@ -208,7 +208,6 @@ void searchStartPos() { // Возвращение (поиск) на домашн
   
   stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0); // Установить позиции 0, 0
   Serial.println("x, y = 0, 0");
-  //buzzer.tone(255, 500); // Пищим
 }
 
 // Прямая задача кинематики для CoreXY
@@ -250,7 +249,6 @@ void manualControl(int type) {
     if (command.length() > 0) { // Если есть доступные данные
       char strBuffer[11] = {};
       command.toCharArray(strBuffer, 11);
-
       // Считываем x и y разделённых пробелом
       int xVal = atoi(strtok(strBuffer, " "));
       int yVal = atoi(strtok(NULL, " "));
