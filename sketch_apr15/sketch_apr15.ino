@@ -26,8 +26,8 @@
 #define SERVO_Z_PIN A2 // Порт серво для перемещения по Z инструмента
 #define SERVO_TOOL_PIN A3 // Порт серво инструмента
 
-#define MAX_X_DIST_MM 140 // Максимальная дистанция по X для перемещения в мм
-#define MAX_Y_DIST_MM 150 // Максимальная дистанция по Y для перемещения в мм
+#define MAX_X_DIST_MM 150 // Максимальная дистанция по X для перемещения в мм
+#define MAX_Y_DIST_MM 145 // Максимальная дистанция по Y для перемещения в мм
 
 #define BUZZER_PORT PORT_4 // Порт пьезопищалки
 #define BUZZER_SLOT SLOT_1 // Слот пьезопищалки, работает только во втором
@@ -42,7 +42,7 @@
 #define STEPPER_Y_DIR_PIN mePort[PORT_2].s1
 #define STEPPER_Y_STP_PIN mePort[PORT_2].s2
 
-#define STEPPERS_MAX_SPEED 5000 // Максимальная скорость шагового двигателя
+#define STEPPERS_MAX_SPEED 2000 // Максимальная скорость шагового двигателя
 #define STEPPERS_ACCEL 15000 // Ускорение шагового двигателя
 #define STEP_TO_ROTATION 400 // Шагов за оборот - 360 градусов
 #define DIST_MM_PER_STEP_X 0.04 // Дистанция в мм за прохождение 1 шага мотора X
@@ -59,10 +59,10 @@
 #define B_CUBE_WITH_RECESS_TYPE -1
 #define G_CUBE_WITH_RECESS_TYPE -1
 
-#define R_ZONE_POS 3 // Радиус координаты позиции, в котором можно найти фигуры
+#define R_ZONE_POS 5 // Радиус координаты позиции, в котором можно найти фигуры
 
 #define XY_CELLS_ARR_LEN 5 // Размер для массивов координат ячеек по X и Y
-#define MAX_TIME_TO_READ_FROM_CAM 2000 // Максимальное время для считываения с камеры
+#define MAX_TIME_TO_READ_FROM_CAM 5000 // Максимальное время для считываения с камеры
 
 MeLimitSwitch xStartlimitSwitch(LIMIT_SWITCH_X_START_PORT, LIMIT_SWITCH_X_START_SLOT);
 MeLimitSwitch yStartlimitSwitch(LIMIT_SWITCH_Y_START_PORT, LIMIT_SWITCH_Y_START_SLOT);
@@ -126,9 +126,10 @@ void setup() {
 }
 
 void loop() {
-  searchStartPos(); // Вернуться на базу и установить 0-е позиции
-  //manualControl(2); // Ручное управление
-  //searchFromCamObj();
+  //searchStartPos(); // Вернуться на базу и установить 0-е позиции
+  //manualControl(1); // Ручное управление
+  moveCoreXY("IK", MAX_X_DIST_MM, MAX_Y_DIST_MM);
+  searchFromCamObj();
   //mySolve();
   while(true) { delay(100); } // Конец выполнения
 }
@@ -149,25 +150,27 @@ unsigned long prevMillis = 0; // stores last time cam was updated
 void searchFromCamObj() {
   do {
     uint8_t n = trackingCam.readBlobs(3); // Считать первые 3 блобсы
-    Serial.println("All blobs");
+    Serial.print("All blobs ");
     Serial.println(n); // Сообщить о количестве найденных блобсах
-    for(int i = 0; i < n; i++) {
-      int objType = trackingCam.blob[i].type;
-      int objCX = trackingCam.blob[i].cx;
-      int objCY = trackingCam.blob[i].cy;
-      Serial.print(objType, DEC); Serial.print(" "); Serial.print(objCX, DEC); Serial.print(" "); Serial.print(objCY, DEC); Serial.println(" ");
+    for(int k = 0; k < n; k++) {
+      int objType = trackingCam.blob[k].type;
+      int objCX = trackingCam.blob[k].cx;
+      int objCY = trackingCam.blob[k].cy;
+      //Serial.print(objType, DEC); Serial.print(" "); Serial.print(objCX, DEC); Serial.print(" "); Serial.print(objCY, DEC); Serial.println(" ");
       for (int i = 0; i < XY_CELLS_ARR_LEN; i++) {
         int cellCamX = storagesCellsCamPosX[i];
         for (int j = 0; j < XY_CELLS_ARR_LEN; j++) {
           if ((i >= 1 && j >= 1) && (i <= 3 && j <= 3) || (i == 0 && j == 0) || (i == 0 && j == 4) || (i == 4 && j == 0) || (i == 4 && j == 4)) continue; // Если смотрим координаты не хранилищ, то пропускаем шаг
           int cellCamY = storagesCellsCamPosY[j];
           if (pow(objCX - cellCamX, 2) + pow(objCY - cellCamY, 2) <= pow(R_ZONE_POS, 2)) { // Если объект с координатами центра попадает в область позиций
-            // Записываем какой объект в координате в массив для хранилищ
-            if (j == 0) storage1[i] = objType; // Если строка первая
-            else if (j == 4) storage3[i] = objType; // Если строка последняя
+            // Записываем какой объект в координате в массив для хранилищ, но, если в ячейку склада уже не было записано значение
+            Serial.print("Found "); Serial.print(objType, DEC); Serial.print(" "); Serial.print(objCX, DEC); Serial.print(" "); Serial.print(objCY, DEC); Serial.print(", "); 
+            Serial.print("pos: "); Serial.print(i); Serial.print(", "); Serial.print(j); Serial.println();
+            if (j == 0 && storage1[i - 1] == -1) storage1[i - 1] = objType; // Если строка первая, то склад 1
+            else if (j == 4 && storage3[i - 1] == -1) storage3[i - 1] = objType; // Если строка последняя, то склад 3
             else { // Иначе остальные - 1 - 3
-              if (i == 0) storage4[i] = objType; // Если ряд первый - 0
-              else if (i == 4) storage2[i] = objType; // Если ряд последний - 4
+              if (i == 0 && storage4[j - 1] == -1) storage4[j - 1] = objType; // Если ряд первый - 0, то склад 4
+              else if (i == 4 && storage2[j - 1] == -1) storage2[j - 1] = objType; // Если ряд последний - 4, то склад 2
             }
           }
         }
@@ -177,6 +180,27 @@ void searchFromCamObj() {
     while(millis() - prevMillis < 33) {};
     prevMillis = millis();
   } while (millis() < MAX_TIME_TO_READ_FROM_CAM); // Ждём время
+  // Выводим
+  for (int i = 0; i < 3; i++) {
+    Serial.print(storage1[i]);
+    Serial.print(" ");
+  }
+  Serial.println();
+  for (int i = 0; i < 3; i++) {
+    Serial.print(storage2[i]);
+    Serial.print(" ");
+  }
+  Serial.println();
+  for (int i = 0; i < 3; i++) {
+    Serial.print(storage3[i]);
+    Serial.print(" ");
+  }
+  Serial.println();
+  for (int i = 0; i < 3; i++) {
+    Serial.print(storage4[i]);
+    Serial.print(" ");
+  }
+  Serial.println();
 }
 
 void indicator(short i, bool state) {
@@ -208,6 +232,31 @@ void searchStartPos() { // Возвращение (поиск) на домашн
   
   stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0); // Установить позиции 0, 0
   Serial.println("x, y = 0, 0");
+}
+
+void moveCoreXY(String type, int x, int y) {
+  int* motPos = new int[2];
+  if (type == "IK") {
+    motPos = IK_CoreXY(140, 150);
+    // Перемещаем
+    while (true) { // Перемещаем моторы в позицию
+      stepperX.moveTo(motPos[0]); stepperY.moveTo(motPos[1]);
+      stepperX.run(); stepperY.run();
+      // Включаем/выключаем светодиоды нулевого положения
+      if (yStartlimitSwitch.touched()) indicator(0, true);
+      else indicator(0, false);
+      if (xStartlimitSwitch.touched()) indicator(1, true);
+      else indicator(1, false);
+      ////
+      if (!stepperX.isRunning() && !stepperY.isRunning()) break; // Мотор остановился выполнив перемещение
+    }
+  } else if (type == "FK") {
+    
+  }
+  if (xStartlimitSwitch.touched() && yStartlimitSwitch.touched()) { // Если позиция была указана 0, 0 то по окончанию обновить стартовую позицию
+    stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0);
+    indicator(0, true); indicator(1, true);
+  }
 }
 
 // Прямая задача кинематики для CoreXY
@@ -255,13 +304,17 @@ void manualControl(int type) {
       Serial.print("xVal: "); Serial.print(xVal); Serial.print(", "); Serial.print("yVal: "); Serial.println(yVal);
       if (type == 1) {
         if (xVal <= MAX_X_DIST_MM && xVal >= 0 && yVal <= MAX_Y_DIST_MM && yVal >= 0) {
-          motPos = IK_CoreXY(xVal, yVal);
+          //motPos = IK_CoreXY(xVal, yVal);
+          Serial.print("motPos0: "); Serial.print(motPos[0]); Serial.print(", "); Serial.print("motPos1: "); Serial.println(motPos[1]);
+          moveCoreXY("IK", xVal, yVal);
         }
       } else if (type == 2) {
-        motPos = IK_CoreXY(cellsPosX[xVal], cellsPosY[yVal]);
+        //motPos = IK_CoreXY(cellsPosX[xVal], cellsPosY[yVal]);
+        Serial.print("motPos0: "); Serial.print(motPos[0]); Serial.print(", "); Serial.print("motPos1: "); Serial.println(motPos[1]);
         Serial.print("cellsPosX: "); Serial.print(cellsPosX[xVal]); Serial.print(", "); Serial.print("cellsPosY: "); Serial.println(cellsPosY[yVal]);
+        moveCoreXY("IK", xVal, yVal);
       }
-      Serial.print("motPos0: "); Serial.print(motPos[0]); Serial.print(", "); Serial.print("motPos1: "); Serial.println(motPos[1]);
+      /*
       // Перемещаем
       while (true) { // Перемещаем моторы в позицию
         stepperX.moveTo(motPos[0]); stepperY.moveTo(motPos[1]);
@@ -277,7 +330,7 @@ void manualControl(int type) {
       if (xStartlimitSwitch.touched() && yStartlimitSwitch.touched()) { // Если позиция была указана 0, 0 то по окончанию обновить стартовую позицию
         stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0);
         indicator(0, true); indicator(1, true);
-      }
+      }*/
     }
   }
 }
