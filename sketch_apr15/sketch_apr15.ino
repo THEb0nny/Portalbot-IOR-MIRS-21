@@ -88,19 +88,10 @@ const int boxCompletateSolve[3][3] = {
   {B_CUBE_WITH_RECESS_TYPE, G_CUBE_WITH_RECESS_TYPE, R_CUBE_WITH_RECESS_TYPE}
 };
 
-/*
 int storage1[3] = {-1, -1, -1}; // Склад сверху
 int storage2[3] = {-1, -1, -1}; // Справа
 int storage3[3] = {-1, -1, -1}; // Снизу
 int storage4[3] = {-1, -1, -1}; // Слева
-*/
-
-int storages[4][3] = {
-  {-1, -1, -1}, // Склад сверху
-  {-1, -1, -1}, // Справа
-  {-1, -1, -1}, // Снизу
-  {-1, -1, -1} // Слева
-};
 
 const int cellsPosX[XY_CELLS_ARR_LEN] = {10, 35, 70, 100, 135}; // Координаты рядов ячеек
 const int cellsPosY[XY_CELLS_ARR_LEN] = {140, 105, 75, 45, 10}; // Координаты строк ячеек
@@ -136,10 +127,6 @@ void setup() {
 }
 
 void loop() {
-  /*controlZ(180);
-  delay(1000);
-  controlZ(0);
-  delay(1000);*/
   //searchStartPos(); // Вернуться на базу и установить 0-е позиции
   //manualControl(1); // Ручное управление
   //moveCoreXY("IK", MAX_X_DIST_MM, MAX_Y_DIST_MM);
@@ -149,12 +136,6 @@ void loop() {
 }
 
 void mySolve() {
-  /*for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 3; j++) {
-      if (storage1[i] == boxCompletataSolve[i][j]) break;
-    }
-  }*/
-  ////
   buzzer.tone(255, 2000); // Пищим о завершении
   Serial.println();
 }
@@ -181,17 +162,11 @@ void searchFromCamObj() {
             // Записываем какой объект в координате в массив для хранилищ, но, если в ячейку склада уже не было записано значение
             Serial.print("Found "); Serial.print(objType, DEC); Serial.print(" "); Serial.print(objCX, DEC); Serial.print(" "); Serial.print(objCY, DEC); Serial.print(", "); 
             Serial.print("pos: "); Serial.print(i); Serial.print(", "); Serial.print(j); Serial.println();
-            /*if (j == 0 && storage1[i - 1] == -1) storage1[i - 1] = objType; // Если строка первая, то склад 1
+            if (j == 0 && storage1[i - 1] == -1) storage1[i - 1] = objType; // Если строка первая, то склад 1
             else if (j == 4 && storage3[i - 1] == -1) storage3[i - 1] = objType; // Если строка последняя, то склад 3
             else { // Иначе остальные - 1 - 3
               if (i == 0 && storage4[j - 1] == -1) storage4[j - 1] = objType; // Если ряд первый - 0, то склад 4
               else if (i == 4 && storage2[j - 1] == -1) storage2[j - 1] = objType; // Если ряд последний - 4, то склад 2
-            }*/
-            if (j == 0 && storages[0][i - 1] == -1) storages[0][i - 1] = objType; // Если строка первая, то склад 1
-            else if (j == 4 && storages[2][i - 1] == -1) storages[2][i - 1] = objType; // Если строка последняя, то склад 3
-            else { // Иначе остальные - 1 - 3
-              if (i == 0 && storages[3][j - 1] == -1) storages[3][j - 1] = objType; // Если ряд первый - 0, то склад 4
-              else if (i == 4 && storages[1][j - 1] == -1) storages[1][j - 1] = objType; // Если ряд последний - 4, то склад 2
             }
           }
         }
@@ -202,7 +177,7 @@ void searchFromCamObj() {
     prevMillis = millis();
   } while (millis() < TIME_TO_READ_FROM_CAM); // Ждём время
   // Выводим
-  /*for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < 3; i++) {
     Serial.print(storage1[i]);
     Serial.print(" ");
   }
@@ -221,14 +196,7 @@ void searchFromCamObj() {
     Serial.print(storage4[i]);
     Serial.print(" ");
   }
-  Serial.println();*/
-  for (int i = 0; i < 4; i++) {
-    for (int j = 0; j < 3; j++) {
-      Serial.print(storages[i][j]);
-      Serial.print(" ");
-    }
-    Serial.println();
-  }
+  Serial.println();
 }
 
 void indicator(short i, bool state) {
