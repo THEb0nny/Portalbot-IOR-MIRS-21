@@ -26,7 +26,7 @@
 #define SERVO_Z_PIN A2 // Порт серво для перемещения по Z инструмента
 #define SERVO_TOOL_PIN A3 // Порт серво инструмента
 
-#define MAX_X_DIST_MM 150 // Максимальная дистанция по X для перемещения в мм
+#define MAX_X_DIST_MM 140 // Максимальная дистанция по X для перемещения в мм
 #define MAX_Y_DIST_MM 145 // Максимальная дистанция по Y для перемещения в мм
 
 #define BUZZER_PORT PORT_4 // Порт пьезопищалки
@@ -119,8 +119,8 @@ void setup() {
   stepperX.setAcceleration(STEPPERS_ACCEL); stepperY.setAcceleration(STEPPERS_ACCEL); // Установка ускорения, в шагах в секунду за секунду
   servoZ.attach(SERVO_Z_PIN); // Подключаем серво Z
   servoTool.attach(SERVO_TOOL_PIN); // Подключаем серво инструмента
-  //controlZ(135); // 130, 0
-  controlTool(0); // 0 - выпущено, 180 - внутри
+  controlZ(180); // 180 - поднято, 0 - опущено
+  controlTool(180); // 180 - внутри, 0 - выпущено
   buzzer.noTone();
   led.setNumber(RGB_LED_NUM); // Колпчество светодиодов в ленте
   for (int i = 0; i < RGB_LED_NUM; i++) indicator(i, false); // Выключаем все светодиодыs
@@ -129,25 +129,36 @@ void setup() {
 }
 
 void loop() {
-  /*controlZ(180);
-  delay(1000);
+  searchStartPos(); // Вернуться на базу и установить 0-е позиции
+  *moveCoreXY("IK", MAX_X_DIST_MM, MAX_Y_DIST_MM);
+  //manualControl(2); // Ручное управление
+  /*moveCoreXY("IK", cellsPosX[1], cellsPosY[1]);
   controlZ(0);
+  delay(1000);
+  controlTool(0);
+  delay(1000);
+  controlZ(180);
+  delay(1000);
+  controlTool(180);
   delay(1000);*/
-  //searchStartPos(); // Вернуться на базу и установить 0-е позиции
-  //manualControl(1); // Ручное управление
-  //moveCoreXY("IK", MAX_X_DIST_MM, MAX_Y_DIST_MM);
-  searchFromCamObj();
+  //searchFromCamObj();
   //mySolve();
   //while(true) { delay(100); } // Конец выполнения
 }
 
 void mySolve() {
-  for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 3; j++) {
+  for (int i = 0; i < 3; i++) { // Идём по массиву необходимой комплетации по столбцам
+    for (int j = 0; j < 3; j++) { // Идём по массиву необходимой комплетации по строкам
       for (int n = 0; n < 4; n++) {
         for (int m = 0; m < 3; m++) {
-          if (boxCompletateSolve[i][j] == storages[n][m]) {
-            
+          if (boxCompletateSolve[i][j] == storages[n][m]) { // Совпадаение
+            /*printf("\nСовпадение %i с %i: ", boxCompletateSolve[i][j], storages[n][m]);
+            //printf("по %i, %i\n", n, m);
+            if (n == 0) printf("координаты с %i, %i\n", cellsPosX[n + 1], cellsPosY[0]);
+            else if (n == 1) printf("координаты с %i, %i\n", cellsPosX[4], cellsPosY[m + 1]);
+            else if (n == 2) printf("координаты с %i, %i\n", cellsPosX[n + 1], cellsPosY[4]);
+            else if (n == 3) printf("координаты с %i, %i\n", cellsPosX[0], cellsPosY[m + 1]);
+            */
           }
         }
       }
@@ -244,9 +255,9 @@ void moveCoreXY(String kinematic, int x, int y) {
     stepperX.moveTo(motPos[0]); stepperY.moveTo(motPos[1]);
     stepperX.run(); stepperY.run();
     // Включаем/выключаем светодиоды нулевого положения
-    if (yStartlimitSwitch.touched()) indicator(0, true);
+    if (xStartlimitSwitch.touched()) indicator(0, true);
     else indicator(0, false);
-    if (xStartlimitSwitch.touched()) indicator(1, true);
+    if (yStartlimitSwitch.touched()) indicator(1, true);
     else indicator(1, false);
     ////
     if (!stepperX.isRunning() && !stepperY.isRunning()) break; // Мотор остановился выполнив перемещение
@@ -281,10 +292,14 @@ int* IK_CoreXY(float x, float y) {
 
 void controlZ(short pos) {
   servoZ.write(pos);
+  if (pos == 180) indicator(2, true);
+  else indicator(2, false);
 }
 
 void controlTool(short pos) {
   servoTool.write(pos);
+  if (pos == 180) indicator(2, true);
+  else indicator(2, false);
 }
 
 // Управление из Serial
@@ -297,20 +312,19 @@ void manualControl(int type) {
       char strBuffer[11] = {};
       command.toCharArray(strBuffer, 11);
       // Считываем x и y разделённых пробелом
-      int xVal = atoi(strtok(strBuffer, " "));
-      int yVal = atoi(strtok(NULL, " "));
-      Serial.print("xVal: "); Serial.print(xVal); Serial.print(", "); Serial.print("yVal: "); Serial.println(yVal);
+      int val1 = atoi(strtok(strBuffer, " "));
+      int val2 = atoi(strtok(NULL, " "));
       if (type == 1) {
-        if (xVal <= MAX_X_DIST_MM && xVal >= 0 && yVal <= MAX_Y_DIST_MM && yVal >= 0) {
-          //motPos = IK_CoreXY(xVal, yVal);
+        if (val2 <= MAX_X_DIST_MM && val2 >= 0 && val2 <= MAX_Y_DIST_MM && val2 >= 0) {
+          Serial.print("xVal: "); Serial.print(val1); Serial.print(", "); Serial.print("yVal: "); Serial.println(val2);
           Serial.print("motPos0: "); Serial.print(motPos[0]); Serial.print(", "); Serial.print("motPos1: "); Serial.println(motPos[1]);
-          moveCoreXY("IK", xVal, yVal);
+          moveCoreXY("IK", val1, val2);
         }
       } else if (type == 2) {
-        //motPos = IK_CoreXY(cellsPosX[xVal], cellsPosY[yVal]);
+        Serial.print("val1: "); Serial.print(val1); Serial.print(", "); Serial.print("val2: "); Serial.println(val2);
         Serial.print("motPos0: "); Serial.print(motPos[0]); Serial.print(", "); Serial.print("motPos1: "); Serial.println(motPos[1]);
-        Serial.print("cellsPosX: "); Serial.print(cellsPosX[xVal]); Serial.print(", "); Serial.print("cellsPosY: "); Serial.println(cellsPosY[yVal]);
-        moveCoreXY("IK", xVal, yVal);
+        Serial.print("cellsPosX: "); Serial.print(cellsPosX[val1]); Serial.print(", "); Serial.print("cellsPosY: "); Serial.println(cellsPosY[val2]);
+        moveCoreXY("IK", cellsPosX[val2], cellsPosY[val1]);
       }
     }
   }
