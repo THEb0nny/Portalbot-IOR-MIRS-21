@@ -62,7 +62,7 @@
 #define R_ZONE_POS 5 // Радиус координаты позиции, в котором можно найти фигуры
 
 #define XY_CELLS_ARR_LEN 5 // Размер для массивов координат ячеек по X и Y
-#define TIME_TO_READ_FROM_CAM 2000 // Максимальное время для считываения с камеры
+#define TIME_TO_READ_FROM_CAM 50000 // Максимальное время для считываения с камеры
 
 MeLimitSwitch xStartlimitSwitch(LIMIT_SWITCH_X_START_PORT, LIMIT_SWITCH_X_START_SLOT);
 MeLimitSwitch yStartlimitSwitch(LIMIT_SWITCH_Y_START_PORT, LIMIT_SWITCH_Y_START_SLOT);
@@ -82,7 +82,7 @@ TrackingCamI2C trackingCam; // Камера
 GTimer_ms myTimer1(10); // Таймер
 
 // Как нужно скомплектовать коробку
-const int boxCompletateSolve[3][3] = {
+const uint8_t boxCompletateSolve[3][3] = {
   {B_BALL_TYPE, G_BALL_TYPE, R_BALL_TYPE},
   {B_CUBE_TYPE, G_CUBE_TYPE, R_CUBE_TYPE},
   {B_CUBE_WITH_RECESS_TYPE, G_CUBE_WITH_RECESS_TYPE, R_CUBE_WITH_RECESS_TYPE}
@@ -95,12 +95,12 @@ int storages[4][3] = {
   {-1, -1, -1} // Склад 4 слева
 };
 
-const int cellsPosX[XY_CELLS_ARR_LEN] = {10, 35, 70, 100, 135}; // Координаты рядов ячеек
-const int cellsPosY[XY_CELLS_ARR_LEN] = {140, 105, 75, 45, 10}; // Координаты строк ячеек
+const uint8_t cellsPosX[XY_CELLS_ARR_LEN] = {10, 35, 70, 100, 135}; // Координаты рядов ячеек
+const uint8_t cellsPosY[XY_CELLS_ARR_LEN] = {140, 105, 75, 45, 10}; // Координаты строк ячеек
 
 // Координаты хранилищ
-const int storagesCellsCamPosX[XY_CELLS_ARR_LEN] = {65, 101, 136, 172, 206};
-const int storagesCellsCamPosY[XY_CELLS_ARR_LEN] = {52, 87, 122, 157, 191};
+const uint8_t storagesCellsCamPosX[XY_CELLS_ARR_LEN] = {65, 99, 136, 172, 206};
+const uint8_t storagesCellsCamPosY[XY_CELLS_ARR_LEN] = {34, 68, 104, 140, 175};
 
 float x, y, lx, ly; // Глобальные переменные координат для работы с перемещением по X, Y
 
@@ -119,21 +119,21 @@ void setup() {
   stepperX.setAcceleration(STEPPERS_ACCEL); stepperY.setAcceleration(STEPPERS_ACCEL); // Установка ускорения, в шагах в секунду за секунду
   servoZ.attach(SERVO_Z_PIN); // Подключаем серво Z
   servoTool.attach(SERVO_TOOL_PIN); // Подключаем серво инструмента
-  controlZ(180); // 180 - поднято, 0 - опущено
-  controlTool(180); // 180 - внутри, 0 - выпущено
   buzzer.noTone();
   led.setNumber(RGB_LED_NUM); // Колпчество светодиодов в ленте
-  for (int i = 0; i < RGB_LED_NUM; i++) indicator(i, false); // Выключаем все светодиодыs
+  for (int i = 0; i < RGB_LED_NUM; i++) indicator(i, false); // Выключаем все светодиоды
+  controlZ(180); // 180 - поднято, 0 - опущено
+  //controlTool(180); // 180 - внутри, 0 - выпущено
   trackingCam.init(51, 100000); // cam_id - 1..127, default 51; speed - 100000/400000, cam enables auto detection of master clock
-  //delay(5000);
+  //delay(1000);
 }
 
 void loop() {
   searchStartPos(); // Вернуться на базу и установить 0-е позиции
-  *moveCoreXY("IK", MAX_X_DIST_MM, MAX_Y_DIST_MM);
   //manualControl(2); // Ручное управление
-  /*moveCoreXY("IK", cellsPosX[1], cellsPosY[1]);
-  controlZ(0);
+  moveCoreXY("IK", MAX_X_DIST_MM, MAX_Y_DIST_MM);
+  searchFromCamObj();
+  /*controlZ(0);
   delay(1000);
   controlTool(0);
   delay(1000);
@@ -141,9 +141,12 @@ void loop() {
   delay(1000);
   controlTool(180);
   delay(1000);*/
-  //searchFromCamObj();
-  //mySolve();
-  //while(true) { delay(100); } // Конец выполнения
+  mySolve();
+  controlZ(180);
+  controlTool(180);
+  searchStartPos();
+  buzzer.tone(255, 2000); // Пищим о завершении
+  while(true) { delay(100); } // Конец выполнения
 }
 
 void mySolve() {
@@ -152,24 +155,51 @@ void mySolve() {
       for (int n = 0; n < 4; n++) {
         for (int m = 0; m < 3; m++) {
           if (boxCompletateSolve[i][j] == storages[n][m]) { // Совпадаение
-            /*printf("\nСовпадение %i с %i: ", boxCompletateSolve[i][j], storages[n][m]);
-            //printf("по %i, %i\n", n, m);
-            if (n == 0) printf("координаты с %i, %i\n", cellsPosX[n + 1], cellsPosY[0]);
-            else if (n == 1) printf("координаты с %i, %i\n", cellsPosX[4], cellsPosY[m + 1]);
-            else if (n == 2) printf("координаты с %i, %i\n", cellsPosX[n + 1], cellsPosY[4]);
-            else if (n == 3) printf("координаты с %i, %i\n", cellsPosX[0], cellsPosY[m + 1]);
-            */
+            int moveCellPosX, moveCellPosY;
+            if (n == 0) {
+              Serial.print("С координат "); Serial.print(cellsPosX[m + 1]); Serial.print(", "); Serial.print(cellsPosY[0]); Serial.print(" взять "); Serial.print(storages[n][m]);
+              moveCellPosX = cellsPosX[m + 1];
+              moveCellPosY = cellsPosY[0];
+            } else if (n == 1) {
+              Serial.print("С координат "); Serial.print(cellsPosX[4]); Serial.print(", "); Serial.print(cellsPosY[m + 1]); Serial.print(" взять "); Serial.print(storages[n][m]);
+              moveCellPosX = cellsPosX[4];
+              moveCellPosY = cellsPosY[m + 1];
+            } else if (n == 2) {
+              Serial.print("С координат "); Serial.print(cellsPosX[m + 1]); Serial.print(", "); Serial.print(cellsPosY[4]); Serial.print(" взять "); Serial.print(storages[n][m]);
+              moveCellPosX = cellsPosX[m + 1];
+              moveCellPosY = cellsPosY[4];
+            } else if (n == 3) {
+              Serial.print("С координат "); Serial.print(cellsPosX[0]); Serial.print(", "); Serial.print(cellsPosY[m + 1]); Serial.print(" взять "); Serial.print(storages[n][m]);
+              moveCellPosX = cellsPosX[0];
+              moveCellPosY = cellsPosY[m + 1];
+            }
+            moveCoreXY("IK", moveCellPosX, moveCellPosY);
+            //
+            controlTool(0);
+            delay(100);
+            controlZ(0);
+            delay(500);
+            controlZ(180);
+            //
+            delay(2000);
+            Serial.print(" и перенести в "); Serial.print(cellsPosX[j + 1]); Serial.print(", "); Serial.println(cellsPosY[i + 1]);
+            moveCoreXY("IK", cellsPosX[j + 1], cellsPosY[i + 1]);
+            //
+            controlZ(0);
+            delay(500);
+            controlZ(180);
+            delay(500);
+            controlZ(180);
+            //
+            delay(2000);
           }
         }
       }
     }
   }
-  ////
-  buzzer.tone(255, 2000); // Пищим о завершении
-  Serial.println();
 }
 
-unsigned long prevMillis = 0; // stores last time cam was updated
+unsigned long prevMillis = 0, camTimer = 0; // stores last time cam was updated
 
 // Считываем данные с камеры и записываем
 void searchFromCamObj() {
@@ -189,8 +219,8 @@ void searchFromCamObj() {
           int cellCamY = storagesCellsCamPosY[j];
           if (pow(objCX - cellCamX, 2) + pow(objCY - cellCamY, 2) <= pow(R_ZONE_POS, 2)) { // Если объект с координатами центра попадает в область позиций
             // Записываем какой объект в координате в массив для хранилищ, но, если в ячейку склада уже не было записано значение
-            Serial.print("Found "); Serial.print(objType, DEC); Serial.print(" "); Serial.print(objCX, DEC); Serial.print(" "); Serial.print(objCY, DEC); Serial.print(", "); 
-            Serial.print("pos: "); Serial.print(i); Serial.print(", "); Serial.print(j); Serial.println();
+            Serial.print("Found "); Serial.print(objType, DEC); Serial.print(" "); Serial.print(objCX, DEC); Serial.print(" "); Serial.print(objCY, DEC); Serial.println(); 
+            //Serial.print("pos: "); Serial.print(i); Serial.print(", "); Serial.print(j); Serial.println();
             if (j == 0 && storages[0][i - 1] == -1) storages[0][i - 1] = objType; // Если строка первая, то склад 1
             else if (j == 4 && storages[2][i - 1] == -1) storages[2][i - 1] = objType; // Если строка последняя, то склад 3
             else { // Иначе остальные - 1 - 3
@@ -204,7 +234,8 @@ void searchFromCamObj() {
     // Ждем следующий кадр
     while(millis() - prevMillis < 33) {};
     prevMillis = millis();
-  } while (millis() < TIME_TO_READ_FROM_CAM); // Ждём время
+    camTimer += prevMillis;
+  } while (camTimer < TIME_TO_READ_FROM_CAM); // Ждём время
   // Выводим
   for (int i = 0; i < 4; i++) {
     for (int j = 0; j < 3; j++) {
@@ -298,8 +329,8 @@ void controlZ(short pos) {
 
 void controlTool(short pos) {
   servoTool.write(pos);
-  if (pos == 180) indicator(2, true);
-  else indicator(2, false);
+  if (pos == 170) indicator(3, true);
+  else indicator(3, false);
 }
 
 // Управление из Serial
