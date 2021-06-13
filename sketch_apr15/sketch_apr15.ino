@@ -36,7 +36,8 @@
 #define RGB_SLOT SLOT_2 // Слот RGB ленты, работает только во втором
 #define RGB_LED_NUM 4 // Количество светодиодов в ленте
 
-// Шаговые двигатели X, Y
+// Шаговые двигатели X, 
+
 #define STEPPER_X_DIR_PIN mePort[PORT_1].s1
 #define STEPPER_X_STP_PIN mePort[PORT_1].s2
 #define STEPPER_Y_DIR_PIN mePort[PORT_2].s1
@@ -62,7 +63,7 @@
 #define R_ZONE_POS 5 // Радиус координаты позиции, в котором можно найти фигуры
 
 #define XY_CELLS_ARR_LEN 5 // Размер для массивов координат ячеек по X и Y
-#define TIME_TO_READ_FROM_CAM 50000 // Максимальное время для считываения с камеры
+#define TIME_TO_READ_FROM_CAM 5000 // Максимальное время для считываения с камеры
 
 MeLimitSwitch xStartlimitSwitch(LIMIT_SWITCH_X_START_PORT, LIMIT_SWITCH_X_START_SLOT);
 MeLimitSwitch yStartlimitSwitch(LIMIT_SWITCH_Y_START_PORT, LIMIT_SWITCH_Y_START_SLOT);
@@ -95,12 +96,12 @@ int storages[4][3] = {
   {-1, -1, -1} // Склад 4 слева
 };
 
-const uint8_t cellsPosX[XY_CELLS_ARR_LEN] = {10, 35, 70, 100, 135}; // Координаты рядов ячеек
-const uint8_t cellsPosY[XY_CELLS_ARR_LEN] = {140, 105, 75, 45, 10}; // Координаты строк ячеек
+const int cellsPosX[XY_CELLS_ARR_LEN] = {3, 35, 70, 100, 130}; // Координаты рядов ячеек
+const int cellsPosY[XY_CELLS_ARR_LEN] = {145, 110, 70, 40, 10}; // Координаты строк ячеек
 
 // Координаты хранилищ
-const uint8_t storagesCellsCamPosX[XY_CELLS_ARR_LEN] = {65, 99, 136, 172, 206};
-const uint8_t storagesCellsCamPosY[XY_CELLS_ARR_LEN] = {34, 68, 104, 140, 175};
+const int storagesCellsCamPosX[XY_CELLS_ARR_LEN] = {66, 97, 132, 171, 203};
+const int storagesCellsCamPosY[XY_CELLS_ARR_LEN] = {27, 62, 96, 132, 166};
 
 float x, y, lx, ly; // Глобальные переменные координат для работы с перемещением по X, Y
 
@@ -123,7 +124,7 @@ void setup() {
   led.setNumber(RGB_LED_NUM); // Колпчество светодиодов в ленте
   for (int i = 0; i < RGB_LED_NUM; i++) indicator(i, false); // Выключаем все светодиоды
   controlZ(180); // 180 - поднято, 0 - опущено
-  //controlTool(180); // 180 - внутри, 0 - выпущено
+  controlTool(180); // 180 - внутри, 0 - выпущено
   trackingCam.init(51, 100000); // cam_id - 1..127, default 51; speed - 100000/400000, cam enables auto detection of master clock
   //delay(1000);
 }
@@ -176,10 +177,11 @@ void mySolve() {
             moveCoreXY("IK", moveCellPosX, moveCellPosY);
             //
             controlTool(0);
-            delay(100);
-            controlZ(0);
             delay(500);
+            controlZ(0);
+            delay(1000);
             controlZ(180);
+            storages[n][m] = -1; // Удаляем
             //
             delay(2000);
             Serial.print(" и перенести в "); Serial.print(cellsPosX[j + 1]); Serial.print(", "); Serial.println(cellsPosY[i + 1]);
@@ -187,7 +189,7 @@ void mySolve() {
             //
             controlZ(0);
             delay(500);
-            controlZ(180);
+            controlTool(180);
             delay(500);
             controlZ(180);
             //
@@ -203,6 +205,7 @@ unsigned long prevMillis = 0, camTimer = 0; // stores last time cam was updated
 
 // Считываем данные с камеры и записываем
 void searchFromCamObj() {
+  unsigned long camTimerStart = millis();
   do {
     uint8_t n = trackingCam.readBlobs(3); // Считать первые 3 блобсы
     Serial.print("All blobs ");
@@ -234,7 +237,7 @@ void searchFromCamObj() {
     // Ждем следующий кадр
     while(millis() - prevMillis < 33) {};
     prevMillis = millis();
-    camTimer += prevMillis;
+    camTimer = millis() - camTimerStart;
   } while (camTimer < TIME_TO_READ_FROM_CAM); // Ждём время
   // Выводим
   for (int i = 0; i < 4; i++) {
@@ -323,13 +326,15 @@ int* IK_CoreXY(float x, float y) {
 
 void controlZ(short pos) {
   servoZ.write(pos);
-  if (pos == 180) indicator(2, true);
+  delay(100);
+  if (pos >= 170) indicator(2, true);
   else indicator(2, false);
 }
 
 void controlTool(short pos) {
   servoTool.write(pos);
-  if (pos == 170) indicator(3, true);
+  delay(100);
+  if (pos >= 170) indicator(3, true);
   else indicator(3, false);
 }
 
