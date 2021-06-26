@@ -32,12 +32,7 @@
 #define BUZZER_PORT PORT_4 // Порт пьезопищалки
 #define BUZZER_SLOT SLOT_1 // Слот пьезопищалки, работает только во втором
 
-#define RGB_PORT PORT_4 // Порт RGB ленты
-#define RGB_SLOT SLOT_2 // Слот RGB ленты, работает только во втором
-#define RGB_LED_NUM 4 // Количество светодиодов в ленте
-
 // Шаговые двигатели X, 
-
 #define STEPPER_X_DIR_PIN mePort[PORT_1].s1
 #define STEPPER_X_STP_PIN mePort[PORT_1].s2
 #define STEPPER_Y_DIR_PIN mePort[PORT_2].s1
@@ -60,8 +55,7 @@
 #define B_CUBE_WITH_RECESS_TYPE -1
 #define G_CUBE_WITH_RECESS_TYPE -1
 
-#define R_ZONE_POS 5 // Радиус координаты позиции, в котором можно найти фигуры
-
+#define R_ZONE_POS 5 // Радиус координаты позиции, в которой можно найти объект
 #define XY_CELLS_ARR_LEN 5 // Размер для массивов координат ячеек по X и Y
 #define TIME_TO_READ_FROM_CAM 5000 // Максимальное время для считываения с камеры
 
@@ -69,8 +63,6 @@ MeLimitSwitch xStartlimitSwitch(LIMIT_SWITCH_X_START_PORT, LIMIT_SWITCH_X_START_
 MeLimitSwitch yStartlimitSwitch(LIMIT_SWITCH_Y_START_PORT, LIMIT_SWITCH_Y_START_SLOT);
 
 MeBuzzer buzzer(BUZZER_PORT, BUZZER_SLOT); // Пьезопищалка
-
-MeRGBLed led(RGB_PORT, RGB_SLOT); // RGB лента
 
 // Шаговые двигатели
 AccelStepper stepperX(AccelStepper::DRIVER, STEPPER_X_STP_PIN, STEPPER_X_DIR_PIN);
@@ -82,14 +74,14 @@ TrackingCamI2C trackingCam; // Камера
 
 GTimer_ms myTimer1(10); // Таймер
 
-// Как нужно скомплектовать коробку
+// Массив с правилами растановки объектов в коробку
 int boxCompletateSolve[3][3] = {
   {-1, -1, -1},
   {-1, -1, -1},
   {-1, -1, -1}
 };
 
-int storages[4][3] = {
+int storages[4][3] = { // Склады
   {-1, -1, -1}, // Склад 1 сверху
   {-1, -1, -1}, // Склад 2 справа
   {-1, -1, -1}, // Склад 3 снизу
@@ -99,7 +91,7 @@ int storages[4][3] = {
 const int cellsPosX[XY_CELLS_ARR_LEN] = {3, 35, 70, 100, 130}; // Координаты рядов ячеек
 const int cellsPosY[XY_CELLS_ARR_LEN] = {145, 110, 70, 40, 10}; // Координаты строк ячеек
 
-// Координаты хранилищ
+// Координаты хранилищ в камере
 const int storagesCellsCamPosX[XY_CELLS_ARR_LEN] = {66, 97, 132, 171, 203};
 const int storagesCellsCamPosY[XY_CELLS_ARR_LEN] = {27, 62, 96, 132, 166};
 
@@ -121,8 +113,6 @@ void setup() {
   servoZ.attach(SERVO_Z_PIN); // Подключаем серво Z
   servoTool.attach(SERVO_TOOL_PIN); // Подключаем серво инструмента
   buzzer.noTone();
-  led.setNumber(RGB_LED_NUM); // Колпчество светодиодов в ленте
-  for (int i = 0; i < RGB_LED_NUM; i++) indicator(i, false); // Выключаем все светодиоды
   controlZ(180); // 180 - поднято, 0 - опущено
   controlTool(180); // 180 - внутри, 0 - выпущено
   trackingCam.init(51, 100000); // cam_id - 1..127, default 51; speed - 100000/400000, cam enables auto detection of master clock
@@ -249,7 +239,7 @@ void searchFromCamObj() {
   }
 }
 
-void setBoxCompletate {
+void setBoxCompletate() {
   int rowForm[3] = {-1, -1, -1}; // Ball - 0, Cube - 1, Cube with recess - 2
   int columnColor[3] = {-1, -1, -1}; // Red - 0, Blue - 1; Green - 2
   // Определяем цвет по колонкам первого склада
@@ -271,34 +261,19 @@ void setBoxCompletate {
   }
 }
 
-/*
-void indicator(short i, bool state) {
-  if (state) led.setColorAt(i, 255, 0, 0); // Включаем красным выбранный
-  else led.setColorAt(i, 0, 0, 1); // Ставим синим выбранный
-  led.show();
-}
-*/
-
 void searchStartPos() { // Возвращение (поиск) на домашнюю позициию
   do {
     while (!yStartlimitSwitch.touched()) { // По y сместиться в крайнюю позицию
       stepperX.setSpeed(STEPPERS_MAX_SPEED); stepperY.setSpeed(STEPPERS_MAX_SPEED);
       stepperX.runSpeed(); stepperY.runSpeed();
     }
-    if (yStartlimitSwitch.touched()) indicator(0, true); // Включаем светодиоды нулевого положения
-    else indicator(0, false); // Иначе выключаем
     ////
     while (!xStartlimitSwitch.touched()) { // По x сместиться в крайнюю позицию
       stepperX.setSpeed(STEPPERS_MAX_SPEED); stepperY.setSpeed(-STEPPERS_MAX_SPEED);
       stepperX.runSpeed(); stepperY.runSpeed();
     }
-    if (xStartlimitSwitch.touched()) indicator(1, true); // Включаем светодиоды нулевого положения
-    else indicator(1, false); // Иначе выключаем
   } while (!yStartlimitSwitch.touched() && !xStartlimitSwitch.touched()); // Пока 2 концевика не сработали
-  
-  // Включаем светодиоды нулевого положения
-  if (yStartlimitSwitch.touched()) indicator(0, true);
-  if (xStartlimitSwitch.touched()) indicator(1, true);
+
   
   stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0); // Установить позиции 0, 0
   Serial.println("x, y = 0, 0");
@@ -312,17 +287,10 @@ void moveCoreXY(String kinematic, int x, int y) {
   while (true) { // Перемещаем моторы в позицию
     stepperX.moveTo(motPos[0]); stepperY.moveTo(motPos[1]);
     stepperX.run(); stepperY.run();
-    // Включаем/выключаем светодиоды нулевого положения
-    if (xStartlimitSwitch.touched()) indicator(0, true);
-    else indicator(0, false);
-    if (yStartlimitSwitch.touched()) indicator(1, true);
-    else indicator(1, false);
-    ////
     if (!stepperX.isRunning() && !stepperY.isRunning()) break; // Мотор остановился выполнив перемещение
   }
   if (xStartlimitSwitch.touched() && yStartlimitSwitch.touched()) { // Если позиция была указана 0, 0 то по окончанию обновить стартовую позицию
     stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0);
-    indicator(0, true); indicator(1, true);
   }
 }
 
@@ -351,15 +319,11 @@ int* IK_CoreXY(float x, float y) {
 void controlZ(short pos) {
   servoZ.write(pos);
   delay(100);
-  if (pos >= 170) indicator(2, true);
-  else indicator(2, false);
 }
 
 void controlTool(short pos) {
   servoTool.write(pos);
   delay(100);
-  if (pos >= 170) indicator(3, true);
-  else indicator(3, false);
 }
 
 // Управление из Serial
