@@ -83,10 +83,10 @@ TrackingCamI2C trackingCam; // Камера
 GTimer_ms myTimer1(10); // Таймер
 
 // Как нужно скомплектовать коробку
-const uint8_t boxCompletateSolve[3][3] = {
-  {B_BALL_TYPE, G_BALL_TYPE, R_BALL_TYPE},
-  {B_CUBE_TYPE, G_CUBE_TYPE, R_CUBE_TYPE},
-  {B_CUBE_WITH_RECESS_TYPE, G_CUBE_WITH_RECESS_TYPE, R_CUBE_WITH_RECESS_TYPE}
+int boxCompletateSolve[3][3] = {
+  {-1, -1, -1},
+  {-1, -1, -1},
+  {-1, -1, -1}
 };
 
 int storages[4][3] = {
@@ -249,11 +249,35 @@ void searchFromCamObj() {
   }
 }
 
+void setBoxCompletate {
+  int rowForm[3] = {-1, -1, -1}; // Ball - 0, Cube - 1, Cube with recess - 2
+  int columnColor[3] = {-1, -1, -1}; // Red - 0, Blue - 1; Green - 2
+  // Определяем цвет по колонкам первого склада
+  for (int j = 0; j < 3; j++) {
+    if (storages[0][j] == R_BALL_TYPE || storages[0][j] == R_CUBE_TYPE || storages[0][j] == R_CUBE_WITH_RECESS_TYPE) columnColor[j] = 0; // Красный
+    else if (storages[0][j] == B_BALL_TYPE || storages[0][i] == B_CUBE_TYPE || storages[0][j] == B_CUBE_WITH_RECESS_TYPE) columnColor[j] = 1; // Синий
+    else if (storages[0][j] == G_BALL_TYPE || storages[0][i] == G_CUBE_TYPE || storages[0][j] == G_CUBE_WITH_RECESS_TYPE) columnColor[j] = 2; // Зелёный
+  }
+  // Проверяем все ли заполнены
+  if (columnColor[0] == -1) { // Если пустое первое поле
+    if (columnColor[1] == 1 && columnColor[2] != 2) columnColor[0] == 0;
+  }
+
+  // Определяем фигуры
+  for (int i = 0; i < 3; i++) { // TO DO
+    if (storages[i][0] == R_BALL_TYPE || storages[i][0] == B_BALL_TYPE || storages[i][0] == G_BALL_TYPE) rowForm[i] = 0; // Шар
+    else if (storages[i][0] == R_CUBE_TYPE || storages[i][0] == B_CUBE_TYPE || storages[i][0] == G_CUBE_TYPE) rowForm[i] = 1; // Куб
+    else if (storages[i][0] == R_CUBE_WITH_RECESS_TYPE || storages[i][0] == B_CUBE_WITH_RECESS_TYPE || storages[i][0] == G_CUBE_WITH_RECESS_TYPE) rowForm[i] = 2; // Шар с выемкой
+  }
+}
+
+/*
 void indicator(short i, bool state) {
   if (state) led.setColorAt(i, 255, 0, 0); // Включаем красным выбранный
   else led.setColorAt(i, 0, 0, 1); // Ставим синим выбранный
   led.show();
 }
+*/
 
 void searchStartPos() { // Возвращение (поиск) на домашнюю позициию
   do {
