@@ -72,7 +72,7 @@ Servo servoZ, servoTool; // Серво инструмента
 
 TrackingCamI2C trackingCam; // Камера
 
-GTimer_ms myTimer1(10); // Таймер
+GTimer_ms myTimer1(TIME_TO_READ_FROM_CAM); // Таймер
 
 // Массив с правилами растановки объектов в коробку
 int boxCompletateSolve[3][3] = {
@@ -104,6 +104,7 @@ float x, y, lx, ly; // Глобальные переменные координ�
 //http://learn.makeblock.com/en/Makeblock-library-for-Arduino/class_me_limit_switch.html
 //https://www.marginallyclever.com/2015/01/adapting-makelangelo-corexy-kinematics/
 //http://wiki.neobot.ru/index.php?title=%D0%A1%D0%B2%D0%B5%D1%82%D0%BE%D0%B4%D0%B8%D0%BE%D0%B4%D0%BD%D0%B0%D1%8F_%D0%BB%D0%B5%D0%BD%D1%82%D0%B0/LED_RGB_Strip-Addressable,_Sealed
+//https://community.alexgyver.ru/resources/biblioteka-gyvertimer.11/
 
 void setup() {
   Serial.begin(115200);
@@ -124,17 +125,9 @@ void loop() {
   //manualControl(2); // Ручное управление
   moveCoreXY("IK", MAX_X_DIST_MM, MAX_Y_DIST_MM);
   searchFromCamObj();
-  /*controlZ(0);
-  delay(1000);
-  controlTool(0);
-  delay(1000);
-  controlZ(180);
-  delay(1000);
-  controlTool(180);
-  delay(1000);*/
+  setBoxCompletate();
+  //
   mySolve();
-  controlZ(180);
-  controlTool(180);
   searchStartPos();
   buzzer.tone(255, 2000); // Пищим о завершении
   while(true) { delay(100); } // Конец выполнения
@@ -191,11 +184,11 @@ void mySolve() {
   }
 }
 
-unsigned long prevMillis = 0, camTimer = 0; // stores last time cam was updated
+unsigned long prevMillis = 0; // stores last time cam was updated
 
 // Считываем данные с камеры и записываем
 void searchFromCamObj() {
-  unsigned long camTimerStart = millis();
+  myTimer1.reset();
   do {
     uint8_t n = trackingCam.readBlobs(3); // Считать первые 3 блобсы
     Serial.print("All blobs ");
@@ -227,8 +220,8 @@ void searchFromCamObj() {
     // Ждем следующий кадр
     while(millis() - prevMillis < 33) {};
     prevMillis = millis();
-    camTimer = millis() - camTimerStart;
-  } while (camTimer < TIME_TO_READ_FROM_CAM); // Ждём время
+  } while (!myTimer1.isReady()); // Ждём время
+  myTimer1.stop(); // Останавливаем таймер
   // Выводим
   for (int i = 0; i < 4; i++) {
     for (int j = 0; j < 3; j++) {
@@ -240,24 +233,56 @@ void searchFromCamObj() {
 }
 
 void setBoxCompletate() {
-  int rowForm[3] = {-1, -1, -1}; // Ball - 0, Cube - 1, Cube with recess - 2
-  int columnColor[3] = {-1, -1, -1}; // Red - 0, Blue - 1; Green - 2
+  int* columnColor[3] = {-1, -1, -1}; // Красный - 1, Синий - 2, Залёный - 3
+  int* rowForm[3] = {-1, -1, -1}; // Шар - 1, Куб - 2, Куб с отверстием - 3
   // Определяем цвет по колонкам первого склада
   for (int j = 0; j < 3; j++) {
-    if (storages[0][j] == R_BALL_TYPE || storages[0][j] == R_CUBE_TYPE || storages[0][j] == R_CUBE_WITH_RECESS_TYPE) columnColor[j] = 0; // Красный
-    else if (storages[0][j] == B_BALL_TYPE || storages[0][i] == B_CUBE_TYPE || storages[0][j] == B_CUBE_WITH_RECESS_TYPE) columnColor[j] = 1; // Синий
-    else if (storages[0][j] == G_BALL_TYPE || storages[0][i] == G_CUBE_TYPE || storages[0][j] == G_CUBE_WITH_RECESS_TYPE) columnColor[j] = 2; // Зелёный
-  }
-  // Проверяем все ли заполнены
-  if (columnColor[0] == -1) { // Если пустое первое поле
-    if (columnColor[1] == 1 && columnColor[2] != 2) columnColor[0] == 0;
+    if (storages[0][j] == R_BALL_TYPE || storages[0][j] == R_CUBE_TYPE || storages[0][j] == R_CUBE_WITH_RECESS_TYPE) columnColor[j] = 1; // Красный
+    else if (storages[0][j] == B_BALL_TYPE || storages[0][j] == B_CUBE_TYPE || storages[0][j] == B_CUBE_WITH_RECESS_TYPE) columnColor[j] = 2; // Синий
+    else if (storages[0][j] == G_BALL_TYPE || storages[0][j] == G_CUBE_TYPE || storages[0][j] == G_CUBE_WITH_RECESS_TYPE) columnColor[j] = 3; // Зелёный
   }
 
-  // Определяем фигуры
-  for (int i = 0; i < 3; i++) { // TO DO
-    if (storages[i][0] == R_BALL_TYPE || storages[i][0] == B_BALL_TYPE || storages[i][0] == G_BALL_TYPE) rowForm[i] = 0; // Шар
-    else if (storages[i][0] == R_CUBE_TYPE || storages[i][0] == B_CUBE_TYPE || storages[i][0] == G_CUBE_TYPE) rowForm[i] = 1; // Куб
-    else if (storages[i][0] == R_CUBE_WITH_RECESS_TYPE || storages[i][0] == B_CUBE_WITH_RECESS_TYPE || storages[i][0] == G_CUBE_WITH_RECESS_TYPE) rowForm[i] = 2; // Шар с выемкой
+  // Проверяем все ли заполнены ячейки с цветами
+  int objSum = 0;
+  for (int i = 0; i < 3; i++) { // Узнаём сумму элементов, которые не равны -1
+    if (columnColor[i] != -1) objSum += columnColor[i];
+  }
+  // Если сумма фигур больше 2-х, то можно добавить нехватающий элемент
+  if (objSum > 2) { // Значит, что 2 элемента известно
+    for (int i = 0; i < 3; i++) {
+      if (columnColor[i] != -1) {
+        // Правила по сумме
+        if (objSum == 3) columnColor[i] = 3;
+        else if (objSum == 4) columnColor[i] = 2;
+        else if (objSum == 5) columnColor[i] = 1;
+        break; // Выходим
+      }
+    }
+  }
+
+  // Определяем формы конфет по 4 складу
+  for (int i = 0; i < 3; i++) {
+    if (storages[i][0] == R_BALL_TYPE || storages[i][0] == B_BALL_TYPE || storages[i][0] == G_BALL_TYPE) rowForm[i] = 1; // Шар
+    else if (storages[i][0] == R_CUBE_TYPE || storages[i][0] == B_CUBE_TYPE || storages[i][0] == G_CUBE_TYPE) rowForm[i] = 2; // Куб
+    else if (storages[i][0] == R_CUBE_WITH_RECESS_TYPE || storages[i][0] == B_CUBE_WITH_RECESS_TYPE || storages[i][0] == G_CUBE_WITH_RECESS_TYPE) rowForm[i] = 3; // Шар с выемкой
+  }
+  
+  // Проверяем все ли заполнены ячейки с формами
+  objSum = 0;
+  for (int j = 0; j < 3; j++) { // Узнаём сумму элементов, которые не равны -1
+    if (rowForm[j] != -1) objSum += rowForm[j];
+  }
+  // Если сумма фигур больше 2-х, то можно добавить нехватающий элемент
+  if (objSum > 2) { // Значит, что 2 элемента известно
+    for (int j = 0; j < 3; j++) {
+      if (rowForm[j] != -1) {
+        // Правила по сумме
+        if (objSum == 3) rowForm[j] = 3;
+        else if (objSum == 4) rowForm[j] = 2;
+        else if (objSum == 5) rowForm[j] = 1;
+        break; // Выходим
+      }
+    }
   }
 }
 
