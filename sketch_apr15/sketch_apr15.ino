@@ -46,14 +46,14 @@
 
 // Номера типов фигур по настройкам камеры
 #define R_BALL_TYPE 0
-#define B_BALL_TYPE 1
-#define G_BALL_TYPE 2
+#define G_BALL_TYPE 1
+#define B_BALL_TYPE 2
 #define R_CUBE_TYPE -1
-#define B_CUBE_TYPE -1
 #define G_CUBE_TYPE -1
+#define B_CUBE_TYPE -1
 #define R_CUBE_WITH_RECESS_TYPE -1
-#define B_CUBE_WITH_RECESS_TYPE -1
 #define G_CUBE_WITH_RECESS_TYPE -1
+#define B_CUBE_WITH_RECESS_TYPE -1
 
 #define R_ZONE_POS 5 // Радиус координаты позиции, в которой можно найти объект
 #define XY_CELLS_ARR_LEN 5 // Размер для массивов координат ячеек по X и Y
