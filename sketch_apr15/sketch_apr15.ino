@@ -258,7 +258,7 @@ void setBoxCompletate() {
   int* columnColor[3] = {-1, -1, -1}; // Красный - 1, Синий - 2, Залёный - 3
   int* rowForm[3] = {-1, -1, -1}; // Шар - 1, Куб - 2, Куб с отверстием - 3
   
-  // Определяем цвет по колонкам ПЕРВОГО (1) склада
+  //// Определяем цвет по колонкам ПЕРВОГО (1) склада
   for (int j = 0; j < 3; j++) {
     if (storages[STORAGE_COLOR_RULES - 1][j] == R_BALL_TYPE || storages[STORAGE_COLOR_RULES - 1][j] == R_CUBE_TYPE || storages[STORAGE_COLOR_RULES - 1][j] == R_CUBE_WITH_RECESS_TYPE) columnColor[j] = RED_OBJ; // Красный
     else if (storages[STORAGE_COLOR_RULES - 1][j] == G_BALL_TYPE || storages[STORAGE_COLOR_RULES - 1][j] == G_CUBE_TYPE || storages[STORAGE_COLOR_RULES - 1][j] == G_CUBE_WITH_RECESS_TYPE) columnColor[j] = GREEN_OBJ; // Зелёный
@@ -284,7 +284,7 @@ void setBoxCompletate() {
   }
   /////////
   
-  // Определяем формы конфет по ЧЕТВЁРТОМУ (4) складу
+  //// Определяем формы конфет по ЧЕТВЁРТОМУ (4) складу
   for (int j = 0; j < 3; j++) {
     if (storages[STORAGE_FORM_RULES - 1][j] == R_BALL_TYPE || storages[STORAGE_FORM_RULES - 1][j] == G_BALL_TYPE || storages[STORAGE_FORM_RULES - 1][j] == B_BALL_TYPE) rowForm[j] = BALL_OBJ; // Тип шар
     else if (storages[STORAGE_FORM_RULES - 1][j] == R_CUBE_TYPE || storages[STORAGE_FORM_RULES - 1][j] == G_CUBE_TYPE || storages[STORAGE_FORM_RULES - 1][j] == B_CUBE_TYPE) rowForm[j] = CUBE_OBJ; // Куб
@@ -308,8 +308,9 @@ void setBoxCompletate() {
       }
     }
   }
+  //////
 
-  // Генерируем необходимое решение для сборки - boxCompletateSolve
+  //// Генерируем необходимое решение для сборки - boxCompletateSolve
   for (int i = 0; i < 3; i++) { // Проходимся по строкам
     for (int j = 0; j < 3; j++) { // Проходимся по столбцам
       if (columnColor[j] == RED_OBJ && rowForm[i] == BALL_OBJ) boxCompletateSolve[i][j] = R_BALL_TYPE; // Если цвет 1 и форма 1, то это красный шар
@@ -323,7 +324,7 @@ void setBoxCompletate() {
       else if (columnColor[j] == BLUE_OBJ && rowForm[i] == CUBE_WITH_RECESS_OBJ) boxCompletateSolve[i][j] = B_CUBE_WITH_RECESS_TYPE; // Если цвет 3 и форма 3, то это синий куб с выемкой
     }
   }
-  ////
+  //////
 }
 
 // Возвращение (поиск) на домашнюю позициию
