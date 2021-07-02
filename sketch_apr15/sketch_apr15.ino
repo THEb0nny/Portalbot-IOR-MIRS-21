@@ -297,7 +297,7 @@ void setBoxCompletate() {
     }
   }
 
-  // Генерируем необходимое решение для сборки
+  // Генерируем необходимое решение для сборки - boxCompletateSolve
   for (int i = 0; i < 3; i++) { // Проходимся по строкам
     for (int j = 0; j < 3; j++) { // Проходимся по столбцам
       if (columnColor[j] == RED_OBJ && rowForm[i] == BALL_OBJ) boxCompletateSolve[i][j] = R_BALL_TYPE; // Если цвет 1 и форма 1, то это красный шар
