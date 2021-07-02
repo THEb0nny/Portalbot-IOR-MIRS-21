@@ -99,11 +99,11 @@ int storages[4][3] = { // Склады
 };
 
 const int cellsPosX[XY_CELLS_ARR_LEN] = {3, 36, 70, 100, 135}; // Координаты рядов ячеек
-const int cellsPosY[XY_CELLS_ARR_LEN] = {135, 103, 72, 40, 8}; // Координаты строк ячеек
+const int cellsPosY[XY_CELLS_ARR_LEN] = {135, 103, 72, 38, 8}; // Координаты строк ячеек
 
 // Координаты хранилищ в камере
-const int storagesCellsCamPosX[XY_CELLS_ARR_LEN] = {66, 97, 132, 171, 203};
-const int storagesCellsCamPosY[XY_CELLS_ARR_LEN] = {27, 62, 96, 132, 166};
+const int storagesCellsCamPosX[XY_CELLS_ARR_LEN] = {70, 104, 139, 175, 209};
+const int storagesCellsCamPosY[XY_CELLS_ARR_LEN] = {23, 56, 92, 128, 162};
 
 float x, y, lx, ly; // Глобальные переменные координат для работы с перемещением по X, Y
 
@@ -135,8 +135,13 @@ void loop() {
   //delay(1500);
   //controlZ(40);
   //delay(1500);
-  searchStartPos(); // Вернуться на базу и установить 0-е позиции
-  manualControl(1); // Ручное управление
+  controlTool(180); // 180 - поднято
+  delay(1500);
+  controlTool(30); // 30 - опущено максимально
+  delay(1500);
+  ////
+  //searchStartPos(); // Вернуться на базу и установить 0-е позиции
+  //manualControl(2); // Ручное управление
   //moveCoreXY("IK", MAX_X_DIST_MM, MAX_Y_DIST_MM);
   //searchFromCamObj(); // Ищем с камеры объекты
   //setBoxCompletate(); // Установить массив с итоговой комплектацией
