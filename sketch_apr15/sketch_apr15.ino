@@ -98,8 +98,8 @@ int storages[4][3] = { // Склады
   {-1, -1, -1} // Склад 4 слева
 };
 
-const int cellsPosX[XY_CELLS_ARR_LEN] = {3, 35, 70, 100, 130}; // Координаты рядов ячеек
-const int cellsPosY[XY_CELLS_ARR_LEN] = {145, 110, 70, 40, 10}; // Координаты строк ячеек
+const int cellsPosX[XY_CELLS_ARR_LEN] = {3, 36, 70, 100, 135}; // Координаты рядов ячеек
+const int cellsPosY[XY_CELLS_ARR_LEN] = {135, 103, 72, 40, 8}; // Координаты строк ячеек
 
 // Координаты хранилищ в камере
 const int storagesCellsCamPosX[XY_CELLS_ARR_LEN] = {66, 97, 132, 171, 203};
@@ -124,22 +124,26 @@ void setup() {
   servoZ.attach(SERVO_Z_PIN); // Подключаем серво Z
   servoTool.attach(SERVO_TOOL_PIN); // Подключаем серво инструмента
   buzzer.noTone();
-  controlZ(180); // 180 - поднято, 0 - опущено
-  controlTool(180); // 180 - внутри, 0 - выпущено
+  //controlZ(180); //
+  //controlTool(180); //
   trackingCam.init(51, 100000); // cam_id - 1..127, default 51; speed - 100000/400000, cam enables auto detection of master clock
   //delay(1000);
 }
 
 void loop() {
+  //controlZ(160); // 40 - поднятно, 160 - опущено
+  //delay(1500);
+  //controlZ(40);
+  //delay(1500);
   searchStartPos(); // Вернуться на базу и установить 0-е позиции
-  //manualControl(2); // Ручное управление
-  moveCoreXY("IK", MAX_X_DIST_MM, MAX_Y_DIST_MM);
-  searchFromCamObj(); // Ищем с камеры объекты
-  setBoxCompletate(); // Установить массив с итоговой комплектацией
-  mySolve(); // Решаем задачу
-  searchStartPos(); // Возвращаемся в нулевую точку после выполнения
-  buzzer.tone(255, 2000); // Пищим о завершении
-  while(true) { delay(100); } // Конец выполнения
+  manualControl(1); // Ручное управление
+  //moveCoreXY("IK", MAX_X_DIST_MM, MAX_Y_DIST_MM);
+  //searchFromCamObj(); // Ищем с камеры объекты
+  //setBoxCompletate(); // Установить массив с итоговой комплектацией
+  //mySolve(); // Решаем задачу
+  //searchStartPos(); // Возвращаемся в нулевую точку после выполнения
+  //buzzer.tone(255, 3000); // Пищим о завершении
+  //while(true) { delay(100); } // Конец выполнения
 }
 
 // Моё решение
@@ -148,7 +152,7 @@ void mySolve() {
     for (int j = 0; j < 3; j++) { // Идём по массиву необходимой комплетации по строкам
       for (int n = 0; n < 4; n++) { //
         for (int m = 0; m < 3; m++) { //
-          if (boxCompletateSolve[i][j] == storages[n][m]) { // Совпадаение
+          if (boxCompletateSolve[i][j] == storages[n][m] && storages[n][m] != -1) { // Совпадаение, пустоту (-1) игнорируем
             int moveCellPosX, moveCellPosY;
             if (n == 0) {
               Serial.print("С координат "); Serial.print(cellsPosX[m + 1]); Serial.print(", "); Serial.print(cellsPosY[0]); Serial.print(" взять "); Serial.print(storages[n][m]);
@@ -207,7 +211,7 @@ void searchFromCamObj() {
       int objType = trackingCam.blob[k].type;
       int objCX = trackingCam.blob[k].cx;
       int objCY = trackingCam.blob[k].cy;
-      //Serial.print(objType, DEC); Serial.print(" "); Serial.print(objCX, DEC); Serial.print(" "); Serial.print(objCY, DEC); Serial.println(" ");
+      Serial.print(objType, DEC); Serial.print(" "); Serial.print(objCX, DEC); Serial.print(" "); Serial.print(objCY, DEC); Serial.println(" "); // Выводим инфу с камеры
       for (int i = 0; i < XY_CELLS_ARR_LEN; i++) { // Проходимся по столбцам хранилищ
         int cellCamX = storagesCellsCamPosX[i]; // Координаты хранилищ для камеры по X
         for (int j = 0; j < XY_CELLS_ARR_LEN; j++) { // Проходимся по строкам хранилищ
