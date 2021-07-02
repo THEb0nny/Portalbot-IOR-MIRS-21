@@ -32,7 +32,7 @@
 #define BUZZER_PORT PORT_4 // Порт пьезопищалки
 #define BUZZER_SLOT SLOT_1 // Слот пьезопищалки, работает только во втором
 
-// Шаговые двигатели X, 
+// Порты подключнния шаговых двигателей
 #define STEPPER_X_DIR_PIN mePort[PORT_1].s1
 #define STEPPER_X_STP_PIN mePort[PORT_1].s2
 #define STEPPER_Y_DIR_PIN mePort[PORT_2].s1
@@ -193,23 +193,23 @@ void searchFromCamObj() {
     uint8_t n = trackingCam.readBlobs(10); // Считать первые n блобсов
     Serial.print("All blobs ");
     Serial.println(n); // Сообщить о количестве найденных блобсах
-    for(int k = 0; k < n; k++) {
+    for(int k = 0; k < n; k++) { // Проходимся по всем блобсам с камеры
       int objType = trackingCam.blob[k].type;
       int objCX = trackingCam.blob[k].cx;
       int objCY = trackingCam.blob[k].cy;
       //Serial.print(objType, DEC); Serial.print(" "); Serial.print(objCX, DEC); Serial.print(" "); Serial.print(objCY, DEC); Serial.println(" ");
-      for (int i = 0; i < XY_CELLS_ARR_LEN; i++) {
-        int cellCamX = storagesCellsCamPosX[i];
-        for (int j = 0; j < XY_CELLS_ARR_LEN; j++) {
-          if ((i >= 1 && j >= 1) && (i <= 3 && j <= 3) || (i == 0 && j == 0) || (i == 0 && j == 4) || (i == 4 && j == 0) || (i == 4 && j == 4)) continue; // Если смотрим координаты не хранилищ, то пропускаем шаг
-          int cellCamY = storagesCellsCamPosY[j];
+      for (int i = 0; i < XY_CELLS_ARR_LEN; i++) { // Проходимся по столбцам хранилищ
+        int cellCamX = storagesCellsCamPosX[i]; // Координаты хранилищ для камеры по X
+        for (int j = 0; j < XY_CELLS_ARR_LEN; j++) { // Проходимся по строкам хранилищ
+          // Если смотрим координаты не хранилищ, то пропускаем шаг
+          if ((i >= 1 && j >= 1) && (i <= 3 && j <= 3) || (i == 0 && j == 0) || (i == 0 && j == 4) || (i == 4 && j == 0) || (i == 4 && j == 4)) continue;
+          int cellCamY = storagesCellsCamPosY[j]; // Координаты хранилищ для камеры по Y
           if (pow(objCX - cellCamX, 2) + pow(objCY - cellCamY, 2) <= pow(R_ZONE_POS, 2)) { // Если объект с координатами центра попадает в область позиций
             // Записываем какой объект в координате в массив для хранилищ, но, если в ячейку склада уже не было записано значение
             Serial.print("Found "); Serial.print(objType, DEC); Serial.print(" "); Serial.print(objCX, DEC); Serial.print(" "); Serial.print(objCY, DEC); Serial.println(); 
-            //Serial.print("pos: "); Serial.print(i); Serial.print(", "); Serial.print(j); Serial.println();
             if (j == 0 && storages[0][i - 1] == -1) storages[0][i - 1] = objType; // Если строка первая, то склад 1
             else if (j == 4 && storages[2][i - 1] == -1) storages[2][i - 1] = objType; // Если строка последняя, то склад 3
-            else { // Иначе остальные - 1 - 3
+            else { // Иначе остальные - 1 или 3
               if (i == 0 && storages[3][j - 1] == -1) storages[3][j - 1] = objType; // Если ряд первый - 0, то склад 4
               else if (i == 4 && storages[1][j - 1] == -1) storages[1][j - 1] = objType; // Если ряд последний - 4, то склад 2
             }
@@ -220,7 +220,7 @@ void searchFromCamObj() {
     // Ждем следующий кадр
     while(millis() - prevMillis < 33) {};
     prevMillis = millis();
-  } while (!myTimer1.isReady()); // Ждём время
+  } while (!myTimer1.isReady()); // Ждём пока закончится время для считывания
   myTimer1.stop(); // Останавливаем таймер
   // Выводим с массива то, что считали
   for (int i = 0; i < 4; i++) {
