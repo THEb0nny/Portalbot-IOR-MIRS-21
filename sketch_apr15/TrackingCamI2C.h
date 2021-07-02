@@ -19,11 +19,11 @@ struct TrackingCamBlobInfo_t
   uint8_t dummy;
   uint16_t cx;
   uint16_t cy;
-  uint8_t area;
-  uint8_t left;
-  uint8_t right;
-  uint8_t top;
-  uint8_t bottom;
+  //uint8_t area;
+  //uint8_t left;
+  //uint8_t right;
+  //uint8_t top;
+  //uint8_t bottom;
   //uint32_t area;
   //uint16_t left;
   //uint16_t right;

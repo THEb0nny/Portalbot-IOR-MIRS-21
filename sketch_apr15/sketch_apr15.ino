@@ -57,7 +57,7 @@
 
 #define R_ZONE_POS 5 // Радиус координаты позиции, в которой можно найти объект
 #define XY_CELLS_ARR_LEN 5 // Размер для массивов координат ячеек по X и Y
-#define TIME_TO_READ_FROM_CAM 5000 // Максимальное время для считываения с камеры
+#define TIME_TO_READ_FROM_CAM 5000 // Время для считываения с камеры
 
 MeLimitSwitch xStartlimitSwitch(LIMIT_SWITCH_X_START_PORT, LIMIT_SWITCH_X_START_SLOT);
 MeLimitSwitch yStartlimitSwitch(LIMIT_SWITCH_Y_START_PORT, LIMIT_SWITCH_Y_START_SLOT);
@@ -124,20 +124,20 @@ void loop() {
   searchStartPos(); // Вернуться на базу и установить 0-е позиции
   //manualControl(2); // Ручное управление
   moveCoreXY("IK", MAX_X_DIST_MM, MAX_Y_DIST_MM);
-  searchFromCamObj();
-  setBoxCompletate();
-  //
-  mySolve();
-  searchStartPos();
+  searchFromCamObj(); // Ищем с камеры объекты
+  setBoxCompletate(); // Установить массив с итоговой комплектацией
+  mySolve(); // Решаем задачу
+  searchStartPos(); // Возвращаемся в нулевую точку после выполнения
   buzzer.tone(255, 2000); // Пищим о завершении
   while(true) { delay(100); } // Конец выполнения
 }
 
+// Моё решение
 void mySolve() {
   for (int i = 0; i < 3; i++) { // Идём по массиву необходимой комплетации по столбцам
     for (int j = 0; j < 3; j++) { // Идём по массиву необходимой комплетации по строкам
-      for (int n = 0; n < 4; n++) {
-        for (int m = 0; m < 3; m++) {
+      for (int n = 0; n < 4; n++) { //
+        for (int m = 0; m < 3; m++) { //
           if (boxCompletateSolve[i][j] == storages[n][m]) { // Совпадаение
             int moveCellPosX, moveCellPosY;
             if (n == 0) {
@@ -157,14 +157,14 @@ void mySolve() {
               moveCellPosX = cellsPosX[0];
               moveCellPosY = cellsPosY[m + 1];
             }
-            moveCoreXY("IK", moveCellPosX, moveCellPosY);
+            moveCoreXY("IK", moveCellPosX, moveCellPosY); // Перемещаемся к найденой
             //
             controlTool(0);
             delay(500);
             controlZ(0);
             delay(1000);
             controlZ(180);
-            storages[n][m] = -1; // Удаляем
+            storages[n][m] = -1; // Удаляем в storages, ставим там пустоту
             //
             delay(2000);
             Serial.print(" и перенести в "); Serial.print(cellsPosX[j + 1]); Serial.print(", "); Serial.println(cellsPosY[i + 1]);
@@ -188,9 +188,9 @@ unsigned long prevMillis = 0; // stores last time cam was updated
 
 // Считываем данные с камеры и записываем
 void searchFromCamObj() {
-  myTimer1.reset();
+  myTimer1.reset(); // Сбросить таймер
   do {
-    uint8_t n = trackingCam.readBlobs(3); // Считать первые 3 блобсы
+    uint8_t n = trackingCam.readBlobs(10); // Считать первые n блобсов
     Serial.print("All blobs ");
     Serial.println(n); // Сообщить о количестве найденных блобсах
     for(int k = 0; k < n; k++) {
@@ -222,7 +222,7 @@ void searchFromCamObj() {
     prevMillis = millis();
   } while (!myTimer1.isReady()); // Ждём время
   myTimer1.stop(); // Останавливаем таймер
-  // Выводим
+  // Выводим с массива то, что считали
   for (int i = 0; i < 4; i++) {
     for (int j = 0; j < 3; j++) {
       Serial.print(storages[i][j]);
@@ -235,6 +235,7 @@ void searchFromCamObj() {
 void setBoxCompletate() {
   int* columnColor[3] = {-1, -1, -1}; // Красный - 1, Синий - 2, Залёный - 3
   int* rowForm[3] = {-1, -1, -1}; // Шар - 1, Куб - 2, Куб с отверстием - 3
+  
   // Определяем цвет по колонкам первого склада
   for (int j = 0; j < 3; j++) {
     if (storages[0][j] == R_BALL_TYPE || storages[0][j] == R_CUBE_TYPE || storages[0][j] == R_CUBE_WITH_RECESS_TYPE) columnColor[j] = 1; // Красный
@@ -259,12 +260,12 @@ void setBoxCompletate() {
       }
     }
   }
-
+  /////////
   // Определяем формы конфет по 4 складу
-  for (int i = 0; i < 3; i++) {
-    if (storages[i][0] == R_BALL_TYPE || storages[i][0] == B_BALL_TYPE || storages[i][0] == G_BALL_TYPE) rowForm[i] = 1; // Шар
-    else if (storages[i][0] == R_CUBE_TYPE || storages[i][0] == B_CUBE_TYPE || storages[i][0] == G_CUBE_TYPE) rowForm[i] = 2; // Куб
-    else if (storages[i][0] == R_CUBE_WITH_RECESS_TYPE || storages[i][0] == B_CUBE_WITH_RECESS_TYPE || storages[i][0] == G_CUBE_WITH_RECESS_TYPE) rowForm[i] = 3; // Шар с выемкой
+  for (int j = 0; j < 3; j++) {
+    if (storages[3][j] == R_BALL_TYPE || storages[3][j] == B_BALL_TYPE || storages[3][j] == G_BALL_TYPE) rowForm[j] = 1; // Тип шар
+    else if (storages[3][j] == R_CUBE_TYPE || storages[3][j] == B_CUBE_TYPE || storages[3][j] == G_CUBE_TYPE) rowForm[j] = 2; // Куб
+    else if (storages[3][j] == R_CUBE_WITH_RECESS_TYPE || storages[3][j] == B_CUBE_WITH_RECESS_TYPE || storages[3][j] == G_CUBE_WITH_RECESS_TYPE) rowForm[j] = 3; // Шар с выемкой
   }
   
   // Проверяем все ли заполнены ячейки с формами
@@ -286,7 +287,8 @@ void setBoxCompletate() {
   }
 }
 
-void searchStartPos() { // Возвращение (поиск) на домашнюю позициию
+// Возвращение (поиск) на домашнюю позициию
+void searchStartPos() {
   do {
     while (!yStartlimitSwitch.touched()) { // По y сместиться в крайнюю позицию
       stepperX.setSpeed(STEPPERS_MAX_SPEED); stepperY.setSpeed(STEPPERS_MAX_SPEED);
@@ -298,12 +300,12 @@ void searchStartPos() { // Возвращение (поиск) на домашн
       stepperX.runSpeed(); stepperY.runSpeed();
     }
   } while (!yStartlimitSwitch.touched() && !xStartlimitSwitch.touched()); // Пока 2 концевика не сработали
-
   
   stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0); // Установить позиции 0, 0
   Serial.println("x, y = 0, 0");
 }
 
+// Перемещение на позицию каретки
 void moveCoreXY(String kinematic, int x, int y) {
   int* motPos = new int[2];
   if (kinematic == "IK") motPos = IK_CoreXY(x, y);
@@ -341,11 +343,13 @@ int* IK_CoreXY(float x, float y) {
   return return_array;
 }
 
+// Управление по Z
 void controlZ(short pos) {
   servoZ.write(pos);
   delay(100);
 }
 
+// Управление инструментом
 void controlTool(short pos) {
   servoTool.write(pos);
   delay(100);

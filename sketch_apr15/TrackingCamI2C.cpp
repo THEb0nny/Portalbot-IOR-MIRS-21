@@ -1,4 +1,4 @@
-#include <TrackingCamI2c.h>
+#include "TrackingCamI2c.h"
 #include <Wire.h>
 
 #define nTRACKINGCAMI2C_DEBUG
@@ -56,7 +56,7 @@ uint8_t TrackingCamI2C::readBlobs(uint8_t max_blob_n)
     idx += 2;
     if(max_blob_n == 0)
       break;
-    blob[i].area = (uint32_t)((((uint16_t)resp[idx]) + (((uint16_t)resp[idx + 1]) << 8))) * 4;
+    /*blob[i].area = (uint32_t)((((uint16_t)resp[idx]) + (((uint16_t)resp[idx + 1]) << 8))) * 4;
     idx += 2;
     blob[i].left = ((uint16_t)resp[idx]) + (((uint16_t)resp[idx + 1]) << 8);
     idx += 2;
@@ -65,7 +65,8 @@ uint8_t TrackingCamI2C::readBlobs(uint8_t max_blob_n)
     blob[i].top = ((uint16_t)resp[idx]) + (((uint16_t)resp[idx + 1]) << 8);
     idx += 2;
     blob[i].bottom = ((uint16_t)resp[idx]) + (((uint16_t)resp[idx + 1]) << 8);
-    idx += 2;
+    idx += 2;*/
+    idx += 10;
   }
   return n;
 }
@@ -140,5 +141,3 @@ static uint8_t TrackingCam_ReadData(uint8_t cam_id, uint8_t addr, uint8_t len, u
 #endif
   return 0;
 }
-
-
