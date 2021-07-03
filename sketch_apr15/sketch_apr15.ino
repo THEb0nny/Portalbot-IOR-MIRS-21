@@ -292,12 +292,10 @@ void setBoxCompletate() {
     if (storages[STORAGE_COLOR_RULES][j] == R_BALL_TYPE || storages[STORAGE_COLOR_RULES][j] == R_CUBE_TYPE || storages[STORAGE_COLOR_RULES][j] == R_CUBE_WITH_RECESS_TYPE) {
       redExists = true;
       columnColor[j] = RED_OBJ; // Красный
-    }
-    else if (storages[STORAGE_COLOR_RULES][j] == G_BALL_TYPE || storages[STORAGE_COLOR_RULES][j] == G_CUBE_TYPE || storages[STORAGE_COLOR_RULES][j] == G_CUBE_WITH_RECESS_TYPE) {
+    } else if (storages[STORAGE_COLOR_RULES][j] == G_BALL_TYPE || storages[STORAGE_COLOR_RULES][j] == G_CUBE_TYPE || storages[STORAGE_COLOR_RULES][j] == G_CUBE_WITH_RECESS_TYPE) {
       greenExists = true;
       columnColor[j] = GREEN_OBJ; // Зелёный
-    }
-    else if (storages[STORAGE_COLOR_RULES][j] == B_BALL_TYPE || storages[STORAGE_COLOR_RULES][j] == B_CUBE_TYPE || storages[STORAGE_COLOR_RULES][j] == B_CUBE_WITH_RECESS_TYPE) {
+    } else if (storages[STORAGE_COLOR_RULES][j] == B_BALL_TYPE || storages[STORAGE_COLOR_RULES][j] == B_CUBE_TYPE || storages[STORAGE_COLOR_RULES][j] == B_CUBE_WITH_RECESS_TYPE) {
       blueExists = true;
       columnColor[j] = BLUE_OBJ; // Синий
     }
