@@ -138,14 +138,15 @@ void loop() {
   //delay(1500);
   //controlZ(40);
   //delay(1500);
-  //controlTool(180); // 180 - поднято
+  //controlTool(180); // 180 - поднято, 30 - опущено максимально
   //delay(1500);
-  //controlTool(30); // 30 - опущено максимально
+  //controlTool(30);
   //delay(1500);
   ////
   searchStartPos(); // Вернуться на базу и установить 0-е позиции
   //manualControl(2); // Ручное управление
-  moveCoreXY("IK", MAX_X_DIST_MM, MAX_Y_DIST_MM);
+  moveCoreXY("IK", cellsPosX[1], cellsPosY[0]); // Чтобы не сбить столбик из жёлтых фигур
+  moveCoreXY("IK", MAX_X_DIST_MM, MAX_Y_DIST_MM); // Перемещаемся в крайнюю точку, чтобы считывать с камеры
   searchFromCamObj(); // Ищем с камеры объекты
   setBoxCompletate(); // Установить массив с итоговой комплектацией
   mySolve(); // Решаем задачу
@@ -160,7 +161,8 @@ void mySolve() {
     for (int j = 0; j < 3; j++) { // Идём по массиву необходимой комплетации по строкам
       for (int n = 0; n < 4; n++) { // Идём по столбцам хранилищ (разным хранилищам)
         for (int m = 0; m < 3; m++) { // Идём по строкам хранилища
-          if (boxCompletateSolve[i][j] == storages[n][m] && boxCompletateSolve[i][j] != -1) { // Если совпадаение, а пустоту (-1) игнорируем
+          if (boxCompletateSolve[i][j] > 2) continue; // Делаем только шары
+          if (boxCompletateSolve[i][j] == storages[n][m] && storages[n][m] != -1) { // Если совпадаение
             int moveCellPosX, moveCellPosY;
             if (n == 0) {
               Serial.print("С координат "); Serial.print(cellsPosX[m + 1]); Serial.print(", "); Serial.print(cellsPosY[0]); Serial.print(" взять "); Serial.print(storages[n][m]);
@@ -179,26 +181,43 @@ void mySolve() {
               moveCellPosX = cellsPosX[0];
               moveCellPosY = cellsPosY[m + 1];
             }
+            
+            //controlTool() - 180 - поднято, 30 - опущено максимально
+            //controlZ() - 40 - поднятно, 160 - опущено
+
             moveCoreXY("IK", moveCellPosX, moveCellPosY); // Перемещаемся к найденой
-            //
             controlTool(30); // Опускаем инструмент
             delay(500);
-            controlZ(160); // Опускаем Z
+            if (0 < storages[n][m] && storages[n][m] < 3) controlZ(170); // Опускаем Z, если это шар, то отпускаем Z так
+            else controlZ(170); // Иначе отпускаем так
             delay(500);
             controlZ(40); // Поднимаем Z
             storages[n][m] = -1; // Удаляем в storages, ставим там пустоту
             //
             delay(500);
             Serial.print(" и перенести в "); Serial.print(cellsPosX[j + 1]); Serial.print(", "); Serial.println(cellsPosY[i + 1]);
-            moveCoreXY("IK", cellsPosX[j + 1], cellsPosY[i + 1]);
+            // СТАРОЕ
+            moveCoreXY("IK", cellsPosX[j + 1], cellsPosY[i + 1]); // Перемещаемся в нужную ячейку, чтобы поставить
+            
+            // НОВОЕ
+            //int tmpCell = 0, tmpRow = 0;
+            //if (n < 2) tmpCell = 0;
+            //else tmpCell = 3;
+            //if (m < 2) tmpRow = 0;
+            //else tmpRow = 3;
+            //moveCoreXY("IK", tmpCell, tmpRow); // Перемещаемся в нужную ячейку, чтобы поставить
+            //moveCoreXY("IK", cellsPosX[j + 1], cellsPosY[i + 1]); // Перемещаемся в нужную ячейку, чтобы поставить
             //
-            controlZ(160); // Опускаем Z
+            
+            //
+            if (0 < storages[n][m] && storages[n][m] < 3) controlZ(170); // Опускаем Z, если это шар, то отпускаем Z так
+            else controlZ(170); // Иначе отпускаем так
             delay(500);
             controlTool(180); // Поднимаем инструмент (отлепляем)
             delay(500);
-            controlZ(40);
+            controlZ(40); // Поднимаем Z
             //
-            delay(1000);
+            delay(500);
           }
         }
       }
@@ -313,6 +332,77 @@ void setBoxCompletate() {
   //// Генерируем необходимое решение для сборки - boxCompletateSolve
   for (int i = 0; i < 3; i++) { // Проходимся по строкам
     for (int j = 0; j < 3; j++) { // Проходимся по столбцам
+      if (i == 1 && j == 1) continue; // Пропускаем центр, чтобы туда ничего не записать (стоят жёлтые фигурки)
+      if (columnColor[j] == RED_OBJ && rowForm[i] == BALL_OBJ) boxCompletateSolve[i][j] = R_BALL_TYPE; // Если цвет 1 и форма 1, то это красный шар
+      else if (columnColor[j] == GREEN_OBJ && rowForm[i] == BALL_OBJ) boxCompletateSolve[i][j] = G_BALL_TYPE; // Если цвет 2 и форма 1, то это зелёный шар
+      else if (columnColor[j] == BLUE_OBJ && rowForm[i] == BALL_OBJ) boxCompletateSolve[i][j] = B_BALL_TYPE; // Если цвет 3 и форма 1, то это синий шар
+      else if (columnColor[j] == RED_OBJ && rowForm[i] == CUBE_OBJ) boxCompletateSolve[i][j] = R_CUBE_TYPE; // Если цвет 1 и форма 2, то это красный куб
+      else if (columnColor[j] == GREEN_OBJ && rowForm[i] == CUBE_OBJ) boxCompletateSolve[i][j] = G_CUBE_TYPE; // Если цвет 1 и форма 2, то это зелёный куб
+      else if (columnColor[j] == BLUE_OBJ && rowForm[i] == CUBE_OBJ) boxCompletateSolve[i][j] = B_CUBE_TYPE; // Если цвет 1 и форма 2, то это зелёный куб
+      else if (columnColor[j] == RED_OBJ && rowForm[i] == CUBE_WITH_RECESS_OBJ) boxCompletateSolve[i][j] = R_CUBE_WITH_RECESS_TYPE; // Если цвет 1 и форма 3, то это красный куб с выемкой
+      else if (columnColor[j] == GREEN_OBJ && rowForm[i] == CUBE_WITH_RECESS_OBJ) boxCompletateSolve[i][j] = G_CUBE_WITH_RECESS_TYPE; // Если цвет 2 и форма 3, то это зелёный куб с выемкой
+      else if (columnColor[j] == BLUE_OBJ && rowForm[i] == CUBE_WITH_RECESS_OBJ) boxCompletateSolve[i][j] = B_CUBE_WITH_RECESS_TYPE; // Если цвет 3 и форма 3, то это синий куб с выемкой
+    }
+  }int columnColor[3] = {-1, -1, -1}; // Красный - 1, Синий - 2, Залёный - 3
+  int rowForm[3] = {-1, -1, -1}; // Шар - 1, Куб - 2, Куб с отверстием - 3
+  
+  // Определяем цвет по колонкам первого склада
+  bool redExists = false, greenExists = false, blueExists = false;
+  for (int j = 0; j < 3; j++) {
+    if (storages[0][j] == R_BALL_TYPE || storages[0][j] == R_CUBE_TYPE || storages[0][j] == R_CUBE_WITH_RECESS_TYPE) {
+     redExists = true;
+      columnColor[j] = RED_OBJ; // Красный
+    }
+    else if (storages[0][j] == G_BALL_TYPE || storages[0][j] == G_CUBE_TYPE || storages[0][j] == G_CUBE_WITH_RECESS_TYPE) {
+      greenExists = true;
+      columnColor[j] = GREEN_OBJ; // Зелёный
+    }
+    else if (storages[0][j] == B_BALL_TYPE || storages[0][j] == B_CUBE_TYPE || storages[0][j] == B_CUBE_WITH_RECESS_TYPE) {
+      blueExists == true;
+      columnColor[j] = BLUE_OBJ; // Синий
+    }
+  }
+  
+  for (int j = 0; j < 3; j++) { // Заполняем у одного не пустого
+    if (columnColor[j] == -1) {
+      if (redExists && greenExists) columnColor[j] == BLUE_OBJ;
+      else if (redExists && blueExists) columnColor[j] == GREEN_OBJ;
+      else if (blueExists && greenExists) columnColor[j] == RED_OBJ;
+      break;
+    }
+  }
+  /////////
+  
+  // Определяем формы конфет по 4 складу
+  bool ballExists = false, cubeExists = false, cubeWithRessExists = false;
+  for (int j = 0; j < 3; j++) {
+    if (storages[3][j] == R_BALL_TYPE || storages[3][j] == B_BALL_TYPE || storages[3][j] == G_BALL_TYPE) {
+      ballExists = true;
+      rowForm[j] = BALL_OBJ; // Тип шар
+    }
+    else if (storages[3][j] == R_CUBE_TYPE || storages[3][j] == B_CUBE_TYPE || storages[3][j] == G_CUBE_TYPE) {
+      cubeExists = true;
+      rowForm[j] = CUBE_OBJ; // Куб
+    }
+    else if (storages[3][j] == R_CUBE_WITH_RECESS_TYPE || storages[3][j] == B_CUBE_WITH_RECESS_TYPE || storages[3][j] == G_CUBE_WITH_RECESS_TYPE) {
+      cubeWithRessExists = true;
+      rowForm[j] = CUBE_WITH_RECESS_OBJ; // Куб с выемкой
+    }
+  }
+  
+  for (int i = 0; i < 3; i++) { // Заполняем у одного не пустого
+    if (columnColor[i] == -1) {
+      if (ballExists && cubeExists) rowForm[i] == CUBE_WITH_RECESS_OBJ;
+      else if (ballExists && cubeWithRessExists) rowForm[i] == CUBE_OBJ;
+      else if (cubeExists && cubeWithRessExists) rowForm[i] == BALL_OBJ;
+      break;
+    }
+  }
+  
+  // Генерируем необходимое решение для сборки - boxCompletateSolve
+  for (int i = 0; i < 3; i++) { // Проходимся по строкам
+    for (int j = 0; j < 3; j++) { // Проходимся по столбцам
+      if (i == 1 && j == 1) continue;
       if (columnColor[j] == RED_OBJ && rowForm[i] == BALL_OBJ) boxCompletateSolve[i][j] = R_BALL_TYPE; // Если цвет 1 и форма 1, то это красный шар
       else if (columnColor[j] == GREEN_OBJ && rowForm[i] == BALL_OBJ) boxCompletateSolve[i][j] = G_BALL_TYPE; // Если цвет 2 и форма 1, то это зелёный шар
       else if (columnColor[j] == BLUE_OBJ && rowForm[i] == BALL_OBJ) boxCompletateSolve[i][j] = B_BALL_TYPE; // Если цвет 3 и форма 1, то это синий шар
