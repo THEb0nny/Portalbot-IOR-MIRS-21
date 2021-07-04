@@ -13,7 +13,7 @@
 #include <Arduino.h>
 #include <MeOrion.h>
 #include <AccelStepper.h>
-#include "TrackingCamI2C.h"
+#include "TrackingCamI2C.h" // Обрезанная версия, чтобы хватало динамической памяти
 #include "GyverTimer.h"
 
 #define LIMIT_SWITCH_X_START_PORT PORT_3 // Порт ближних концевиков к моторам по Y
@@ -161,7 +161,7 @@ void loop() {
   setBoxCompletate(); // Установить массив с итоговой комплектацией
   mySolve(); // Решаем задачу
   searchStartPos(); // Возвращаемся в нулевую точку после выполнения
-  buzzer.tone(255, 3000); // Пищим о завершении
+  buzzer.tone(255, 5000); // Пищим о завершении
   while(true) { delay(100); } // Конец выполнения
 }
 
@@ -308,7 +308,7 @@ void setBoxCompletate() {
       if (redExists && greenExists) columnColor[j] = BLUE_OBJ;
       else if (redExists && blueExists) columnColor[j] = GREEN_OBJ;
       else if (blueExists && greenExists) columnColor[j] = RED_OBJ;
-      else if (redExists) { // Если камера увидила один, то получается надо нарандомить другие
+      /*else if (redExists) { // Если камера увидила один, то получается надо нарандомить другие
         columnColor[j] = random(GREEN_OBJ, BLUE_OBJ + 1);
       } else if (greenExists) { // Рандомим, если у нас один зелёный
         int tmpRandColor = 0;
@@ -319,7 +319,7 @@ void setBoxCompletate() {
         columnColor[j] = tmpRandColor;
       } if (blueExists) { // Рандомим, если у нас один синий
         columnColor[j] = random(RED_OBJ, GREEN_OBJ + 1);
-      }
+      }*/
     }
   }
   /////////
@@ -344,7 +344,7 @@ void setBoxCompletate() {
       if (ballExists && cubeExists) rowForm[i] = CUBE_WITH_RECESS_OBJ;
       else if (ballExists && cubeWithRessExists) rowForm[i] = CUBE_OBJ;
       else if (cubeExists && cubeWithRessExists) rowForm[i] = BALL_OBJ;
-      else if (ballExists) { // Если камера увидила один, то получается надо нарандомить другие
+      /*else if (ballExists) { // Если камера увидила один, то получается надо нарандомить другие
         rowForm[i] = random(CUBE_OBJ, CUBE_WITH_RECESS_OBJ + 1);
       } else if (cubeExists) { // Рандомим, если у нас один зелёный
         int tmpRandForm = 0;
@@ -355,7 +355,7 @@ void setBoxCompletate() {
         rowForm[i] = tmpRandForm;
       } if (cubeWithRessExists) { // Рандомим, если у нас один синий
         rowForm[i] = random(BALL_OBJ, CUBE_OBJ + 1);
-      }
+      }*/
     }
   }
   //////
