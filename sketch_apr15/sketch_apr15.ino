@@ -306,7 +306,19 @@ void setBoxCompletate() {
       if (redExists && greenExists) columnColor[j] = BLUE_OBJ;
       else if (redExists && blueExists) columnColor[j] = GREEN_OBJ;
       else if (blueExists && greenExists) columnColor[j] = RED_OBJ;
-      break;
+      else if (redExists) { // Если камера увидила один, то получается надо нарандомить другие
+        columnColor[j] = random(GREEN_OBJ, BLUE_OBJ + 1);
+      } else if (greenExists) { // Рандомим, если у нас один зелёный
+        int tmpRandColor = 0;
+        while (true) {
+          tmpRandColor = random(RED_OBJ, BLUE_OBJ + 1);
+          if (tmpRandColor != GREEN_OBJ) break;
+        }
+        columnColor[j] = tmpRandColor;
+      } if (blueExists) { // Рандомим, если у нас один синий
+        columnColor[j] = random(RED_OBJ, GREEN_OBJ + 1);
+      }
+      //break;
     }
   }
   /////////
@@ -331,7 +343,19 @@ void setBoxCompletate() {
       if (ballExists && cubeExists) rowForm[i] = CUBE_WITH_RECESS_OBJ;
       else if (ballExists && cubeWithRessExists) rowForm[i] = CUBE_OBJ;
       else if (cubeExists && cubeWithRessExists) rowForm[i] = BALL_OBJ;
-      break;
+      else if (ballExists) { // Если камера увидила один, то получается надо нарандомить другие
+        rowForm[i] = random(CUBE_OBJ, CUBE_WITH_RECESS_OBJ + 1);
+      } else if (cubeExists) { // Рандомим, если у нас один зелёный
+        int tmpRandForm = 0;
+        while (true) {
+          tmpRandForm = random(BALL_OBJ, CUBE_WITH_RECESS_OBJ + 1);
+          if (tmpRandForm != CUBE_OBJ) break;
+        }
+        rowForm[i] = tmpRandForm;
+      } if (cubeWithRessExists) { // Рандомим, если у нас один синий
+        rowForm[i] = random(BALL_OBJ, CUBE_OBJ + 1);
+      }
+      //break;
     }
   }
   //////
