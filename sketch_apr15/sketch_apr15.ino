@@ -88,18 +88,18 @@ TrackingCamI2C trackingCam; // Камера
 
 GTimer_ms myTimer1(TIME_TO_READ_FROM_CAM); // Таймер
 
+int storages[4][3] = { // Склады
+  {5, -1, 3}, // Склад 1 сверху
+  {7, -1, 4}, // Склад 2 справа
+  {0, 6, 1}, // Склад 3 снизу
+  {-1, 2, 8} // Склад 4 слева
+};
+
 // Массив с правилами растановки в коробку
 int boxCompletateSolve[3][3] = {
   {-1, -1, -1},
   {-1, -1, -1},
   {-1, -1, -1}
-};
-
-int storages[4][3] = { // Склады
-  {-1, -1, -1}, // Склад 1 сверху
-  {-1, -1, -1}, // Склад 2 справа
-  {-1, -1, -1}, // Склад 3 снизу
-  {-1, -1, -1} // Склад 4 слева
 };
 
 const int cellsPosX[XY_CELLS_ARR_LEN] = {3, 36, 70, 100, 135}; // Координаты рядов ячеек
@@ -139,6 +139,7 @@ void setup() {
 //controlZ(180); // 40 - поднятно, 180 - опущено
 
 void loop() {
+  /*
   controlTool(30); // Опускаем
   delay(1500);
   controlZ(150); // Опускаем
@@ -149,18 +150,19 @@ void loop() {
   delay(1500);
   controlTool(180); // Поднимаем
   delay(1500);
+  */
   
   ////
-  //searchStartPos(); // Вернуться на базу и установить 0-е позиции
+  searchStartPos(); // Вернуться на базу и установить 0-е позиции
   //manualControl(2); // Ручное управление
-  //moveCoreXY("IK", cellsPosX[0], cellsPosY[0]); // Чтобы не сбить столбик из жёлтых фигур перемещаемся не сразу по диагонали
-  //moveCoreXY("IK", MAX_X_DIST_MM, MAX_Y_DIST_MM); // Перемещаемся в крайнюю точку, чтобы считывать с камеры
-  //searchFromCamObj(); // Ищем с камеры объекты
-  //setBoxCompletate(); // Установить массив с итоговой комплектацией
-  //mySolve(); // Решаем задачу
-  //searchStartPos(); // Возвращаемся в нулевую точку после выполнения
-  //buzzer.tone(255, 3000); // Пищим о завершении
-  //while(true) { delay(100); } // Конец выполнения
+  moveCoreXY("IK", cellsPosX[0], cellsPosY[0]); // Чтобы не сбить столбик из жёлтых фигур перемещаемся не сразу по диагонали
+  moveCoreXY("IK", MAX_X_DIST_MM, MAX_Y_DIST_MM); // Перемещаемся в крайнюю точку, чтобы считывать с камеры
+  searchFromCamObj(); // Ищем с камеры объекты
+  setBoxCompletate(); // Установить массив с итоговой комплектацией
+  mySolve(); // Решаем задачу
+  searchStartPos(); // Возвращаемся в нулевую точку после выполнения
+  buzzer.tone(255, 3000); // Пищим о завершении
+  while(true) { delay(100); } // Конец выполнения
 }
 
 // Моё решение
@@ -318,7 +320,6 @@ void setBoxCompletate() {
       } if (blueExists) { // Рандомим, если у нас один синий
         columnColor[j] = random(RED_OBJ, GREEN_OBJ + 1);
       }
-      //break;
     }
   }
   /////////
@@ -355,7 +356,6 @@ void setBoxCompletate() {
       } if (cubeWithRessExists) { // Рандомим, если у нас один синий
         rowForm[i] = random(BALL_OBJ, CUBE_OBJ + 1);
       }
-      //break;
     }
   }
   //////
@@ -363,7 +363,7 @@ void setBoxCompletate() {
   // Генерируем необходимое решение для сборки - boxCompletateSolve
   for (int i = 0; i < 3; i++) { // Проходимся по строкам
     for (int j = 0; j < 3; j++) { // Проходимся по столбцам
-      //if (i == 1 && j == 1) continue; // Жёлтая башня в центре
+      if (i == 2 && j == 2) continue; // Жёлтая башня в центре
       if (columnColor[j] == RED_OBJ && rowForm[i] == BALL_OBJ) boxCompletateSolve[i][j] = R_BALL_TYPE; // Если цвет 1 и форма 1, то это красный шар
       else if (columnColor[j] == GREEN_OBJ && rowForm[i] == BALL_OBJ) boxCompletateSolve[i][j] = G_BALL_TYPE; // Если цвет 2 и форма 1, то это зелёный шар
       else if (columnColor[j] == BLUE_OBJ && rowForm[i] == BALL_OBJ) boxCompletateSolve[i][j] = B_BALL_TYPE; // Если цвет 3 и форма 1, то это синий шар
@@ -376,7 +376,7 @@ void setBoxCompletate() {
     }
   }
   Serial.println("BoxCompletateSolve:");
-  for (int i = 0; i < 4; i++) { // Проходимся по строкам хранилища
+  for (int i = 0; i < 3; i++) { // Проходимся по строкам хранилища
     for (int j = 0; j < 3; j++) { // Проходимся по столбцам хранилища
       Serial.print(boxCompletateSolve[i][j]);
       Serial.print(" ");
