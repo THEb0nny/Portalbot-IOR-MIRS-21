@@ -1,3 +1,11 @@
+// http://forum.amperka.ru/threads/%D0%91%D0%B8%D0%B1%D0%BB%D0%B8%D0%BE%D1%82%D0%B5%D0%BA%D0%B0-accelstepper.11388/
+// http://www.airspayce.com/mikem/arduino/AccelStepper/index.html
+// http://learn.makeblock.com/Makeblock-library-for-Arduino/class_me_port.html
+// http://learn.makeblock.com/en/Makeblock-library-for-Arduino/class_me_limit_switch.html
+// https://www.marginallyclever.com/2015/01/adapting-makelangelo-corexy-kinematics/
+// http://wiki.neobot.ru/index.php?title=%D0%A1%D0%B2%D0%B5%D1%82%D0%BE%D0%B4%D0%B8%D0%BE%D0%B4%D0%BD%D0%B0%D1%8F_%D0%BB%D0%B5%D0%BD%D1%82%D0%B0/LED_RGB_Strip-Addressable,_Sealed
+// https://community.alexgyver.ru/resources/biblioteka-gyvertimer.11/
+
 /** Arduino I2C blobs example.
  * Settings: Blob detector, I2C, addr 51, Dynamixel API, 5V.
  * Wiring:
@@ -22,8 +30,7 @@
 #define LIMIT_SWITCH_Y_START_PORT PORT_3 // Порт концевика для коретки со стороны мотора X
 #define LIMIT_SWITCH_Y_START_SLOT SLOT_2 // Слот концевика для коретки со стороны мотора X
 
-// Серво Z и инструмента
-#define SERVO_Z_PIN A2 // Пин серво для перемещения по Z инструмента
+#define SERVO_Z_PIN A2 // Пин серво для перемещения по Z
 #define SERVO_TOOL_PIN A3 // Пин серво инструмента
 
 #define MAX_X_DIST_MM 140 // Максимальная дистанция по X для перемещения в мм
@@ -86,7 +93,7 @@ Servo servoZ, servoTool; // Серво инструмента
 
 TrackingCamI2C trackingCam; // Камера
 
-GTimer_ms myTimer1(TIME_TO_READ_FROM_CAM); // Таймер
+GTimer_ms camTimer(TIME_TO_READ_FROM_CAM); // Таймер
 
 int storages[4][3] = { // Склады
   {5, -1, 3}, // Склад 1 сверху
@@ -109,30 +116,20 @@ const int cellsPosY[XY_CELLS_ARR_LEN] = {135, 103, 72, 38, 8}; // Координ
 const int storagesCellsCamPosX[XY_CELLS_ARR_LEN] = {70, 104, 139, 175, 209};
 const int storagesCellsCamPosY[XY_CELLS_ARR_LEN] = {23, 56, 92, 128, 162};
 
-float x, y, lx, ly; // Глобальные переменные координат для работы с перемещением по X, Y
-
-// ИНФА
-//http://forum.amperka.ru/threads/%D0%91%D0%B8%D0%B1%D0%BB%D0%B8%D0%BE%D1%82%D0%B5%D0%BA%D0%B0-accelstepper.11388/
-//http://www.airspayce.com/mikem/arduino/AccelStepper/index.html
-//http://learn.makeblock.com/Makeblock-library-for-Arduino/class_me_port.html
-//http://learn.makeblock.com/en/Makeblock-library-for-Arduino/class_me_limit_switch.html
-//https://www.marginallyclever.com/2015/01/adapting-makelangelo-corexy-kinematics/
-//http://wiki.neobot.ru/index.php?title=%D0%A1%D0%B2%D0%B5%D1%82%D0%BE%D0%B4%D0%B8%D0%BE%D0%B4%D0%BD%D0%B0%D1%8F_%D0%BB%D0%B5%D0%BD%D1%82%D0%B0/LED_RGB_Strip-Addressable,_Sealed
-//https://community.alexgyver.ru/resources/biblioteka-gyvertimer.11/
+float x, y, lx, ly; // Глобальные переменные координат для работы с перемещением по X, Y кинематики CoreXY
 
 void setup() {
   Serial.begin(115200);
   Serial.setTimeout(5);
+  Serial.println();
   stepperX.setMaxSpeed(STEPPERS_MAX_SPEED); stepperY.setMaxSpeed(STEPPERS_MAX_SPEED); // Установка максимальной скорости (оборотов в минуту). При движении шаговый двигатель будет ускоряться до этой максимальной скорости и замедляться при подходе к концу движения
   stepperX.setAcceleration(STEPPERS_ACCEL); stepperY.setAcceleration(STEPPERS_ACCEL); // Установка ускорения, в шагах в секунду за секунду
   servoZ.attach(SERVO_Z_PIN); // Подключаем серво Z
   servoTool.attach(SERVO_TOOL_PIN); // Подключаем серво инструмента
   buzzer.noTone();
-  controlZ(40); // Поднимаем Z
-  controlTool(180); // Поднимаем инструмент
+  ControlZ(40, 0); // Поднимаем Z
+  ControlTool(180, 0); // Поднимаем инструмент
   trackingCam.init(51, 100000); // cam_id - 1..127, default 51; speed - 100000/400000, cam enables auto detection of master clock
-  //delay(1000);
-  Serial.println();
 }
 
 //controlTool(180); // 180 - поднято, 30 - опущено максимально
@@ -151,22 +148,20 @@ void loop() {
   controlTool(180); // Поднимаем
   delay(1500);
   */
-  
-  ////
-  searchStartPos(); // Вернуться на базу и установить 0-е позиции
-  //manualControl(2); // Ручное управление
-  moveCoreXY("IK", cellsPosX[0], cellsPosY[0]); // Чтобы не сбить столбик из жёлтых фигур перемещаемся не сразу по диагонали
-  moveCoreXY("IK", MAX_X_DIST_MM, MAX_Y_DIST_MM); // Перемещаемся в крайнюю точку, чтобы считывать с камеры
-  searchFromCamObj(); // Ищем с камеры объекты
-  setBoxCompletate(); // Установить массив с итоговой комплектацией
-  mySolve(); // Решаем задачу
-  searchStartPos(); // Возвращаемся в нулевую точку после выполнения
+  SearchStartPos(); // Вернуться на базу и установить 0-е позиции
+  //ManualControl(2); // Ручное управление
+  MoveToPosCoreXY(cellsPosX[0], cellsPosY[0]); // Чтобы не сбить столбик из жёлтых фигур перемещаемся не сразу по диагонали
+  MoveToPosCoreXY(MAX_X_DIST_MM, MAX_Y_DIST_MM); // Перемещаемся в крайнюю точку, чтобы считывать с камеры
+  SearchFromCamObj(); // Ищем с камеры объекты
+  SetBoxCompletate(); // Установить массив с итоговой комплектацией
+  Solve(); // Решаем задачу
+  SearchStartPos(); // Возвращаемся в нулевую точку после выполнения
   buzzer.tone(255, 5000); // Пищим о завершении
   while(true) { delay(100); } // Конец выполнения
 }
 
 // Моё решение
-void mySolve() {
+void Solve() {
   for (int i = 0; i < 3; i++) { // Идём по массиву необходимой комплетации по столбцам
     for (int j = 0; j < 3; j++) { // Идём по массиву необходимой комплетации по строкам
       for (int n = 0; n < 4; n++) { // Идём по столбцам хранилищ (разным хранилищам)
@@ -191,43 +186,29 @@ void mySolve() {
               moveCellPosX = cellsPosX[0];
               moveCellPosY = cellsPosY[m + 1];
             }
-            
-            //controlTool() - 180 - поднято, 30 - опущено максимально
-            //controlZ() - 40 - поднятно, 160 - опущено
+            //ControlTool() - 180 - поднято, 30 - опущено максимально
+            //ControlZ() - 40 - поднятно, 160 - опущено
 
-            moveCoreXY("IK", moveCellPosX, moveCellPosY); // Перемещаемся к найденой
-            controlTool(30); // Опускаем инструмент
-            delay(500);
-            if (0 <= storages[n][m] && storages[n][m] < 3) controlZ(170); // Опускаем Z, если это шар, то отпускаем Z так
-            else controlZ(160); // Иначе отпускаем так
-            delay(500);
-            controlZ(40); // Поднимаем Z
+            MoveToPosCoreXY(moveCellPosX, moveCellPosY); // Перемещаемся к найденой
+            ControlTool(30, 500); // Опускаем инструмент
+            if (0 <= storages[n][m] && storages[n][m] < 3) ControlZ(170, 500); // Опускаем Z, если это шар, то отпускаем Z так
+            else ControlZ(160, 500); // Иначе отпускаем так
+            ControlZ(40, 500); // Поднимаем Z
             storages[n][m] = -1; // Удаляем в storages, ставим там пустоту
-            //
-            delay(500);
             Serial.print(" и перенести в "); Serial.print(cellsPosX[j + 1]); Serial.print(", "); Serial.println(cellsPosY[i + 1]);
-            // СТАРОЕ
-            moveCoreXY("IK", cellsPosX[j + 1], cellsPosY[i + 1]); // Перемещаемся в нужную ячейку, чтобы поставить
-            
+            MoveToPosCoreXY(cellsPosX[j + 1], cellsPosY[i + 1]); // Перемещаемся в нужную ячейку, чтобы поставить
             // НОВОЕ
             //int tmpCell = 0, tmpRow = 0;
             //if (n < 2) tmpCell = 0;
             //else tmpCell = 3;
             //if (m < 2) tmpRow = 0;
             //else tmpRow = 3;
-            //moveCoreXY("IK", tmpCell, tmpRow); // Перемещаемся в нужную ячейку, чтобы поставить
-            //moveCoreXY("IK", cellsPosX[j + 1], cellsPosY[i + 1]); // Перемещаемся в нужную ячейку, чтобы поставить
-            //
-            
-            //
-            if (0 <= storages[n][m] && storages[n][m] < 3) controlZ(170); // Опускаем Z, если это шар, то отпускаем Z так
-            else controlZ(160); // Иначе отпускаем так
-            delay(500);
-            controlTool(180); // Поднимаем инструмент (отлепляем)
-            delay(500);
-            controlZ(40); // Поднимаем Z
-            //
-            delay(500);
+            //MoveToPosCoreXY(tmpCell, tmpRow); // Перемещаемся в нужную ячейку, чтобы поставить
+            //MoveToPosCoreXY(cellsPosX[j + 1], cellsPosY[i + 1]); // Перемещаемся в нужную ячейку, чтобы поставить
+            if (0 <= storages[n][m] && storages[n][m] < 3) ControlZ(170, 500); // Опускаем Z так, если это шар
+            else ControlZ(160, 500); // Иначе отпускаем так
+            ControlTool(180, 500); // Поднимаем инструмент (отлепляем)
+            ControlZ(40, 500); // Поднимаем Z
           }
         }
       }
@@ -235,11 +216,10 @@ void mySolve() {
   }
 }
 
-unsigned long prevMillis = 0; // stores last time cam was updated
-
 // Считываем данные с камеры и записываем
-void searchFromCamObj() {
-  myTimer1.reset(); // Сбросить таймер
+void SearchFromCamObj() {
+  unsigned long prevMillis = 0;
+  camTimer.reset(); // Сбросить таймер
   do {
     uint8_t n = trackingCam.readBlobs(MAX_CAM_BLOBS_READ); // Считать первые n блобсов
     Serial.print("All blobs ");
@@ -269,12 +249,11 @@ void searchFromCamObj() {
       }
     }
     // Ждем следующий кадр
-    while(millis() - prevMillis < 33) {};
+    while(millis() - prevMillis < 33);
     prevMillis = millis();
-  } while (!myTimer1.isReady()); // Ждём пока закончится время для считывания
-  myTimer1.stop(); // Останавливаем таймер
-  // Выводим с массива то, что считали
-  Serial.println("Storages:");
+  } while (!camTimer.isReady()); // Ждём пока закончится время для считывания
+  camTimer.stop(); // Останавливаем таймер
+  Serial.println("Storages:"); // Выводим с массива то, что считали
   for (int i = 0; i < 4; i++) { // Проходимся по строкам хранилища
     for (int j = 0; j < 3; j++) { // Проходимся по столбцам хранилища
       Serial.print(storages[i][j]);
@@ -284,10 +263,10 @@ void searchFromCamObj() {
   }
 }
 
-void setBoxCompletate() {
+// Расчитать правила растановки по найденным объектам
+void SetBoxCompletate() {
   int columnColor[3] = {-1, -1, -1}; // Красный - 1, Синий - 2, Залёный - 3
   int rowForm[3] = {-1, -1, -1}; // Шар - 1, Куб - 2, Куб с отверстием - 3
-  
   //// Определяем ЦВЕТА по колонкам первого склада
   bool redExists = false, greenExists = false, blueExists = false;
   for (int j = 0; j < 3; j++) {
@@ -302,27 +281,14 @@ void setBoxCompletate() {
       columnColor[j] = BLUE_OBJ; // Синий
     }
   }
- 
+
   for (int j = 0; j < 3; j++) { // Заполняем у одного не пустого
     if (columnColor[j] == -1) {
       if (redExists && greenExists) columnColor[j] = BLUE_OBJ;
       else if (redExists && blueExists) columnColor[j] = GREEN_OBJ;
       else if (blueExists && greenExists) columnColor[j] = RED_OBJ;
-      /*else if (redExists) { // Если камера увидила один, то получается надо нарандомить другие
-        columnColor[j] = random(GREEN_OBJ, BLUE_OBJ + 1);
-      } else if (greenExists) { // Рандомим, если у нас один зелёный
-        int tmpRandColor = 0;
-        while (true) {
-          tmpRandColor = random(RED_OBJ, BLUE_OBJ + 1);
-          if (tmpRandColor != GREEN_OBJ) break;
-        }
-        columnColor[j] = tmpRandColor;
-      } if (blueExists) { // Рандомим, если у нас один синий
-        columnColor[j] = random(RED_OBJ, GREEN_OBJ + 1);
-      }*/
     }
   }
-  /////////
  
   //// Определяем ФОРМЫ конфет по 4 складу
   bool ballExists = false, cubeExists = false, cubeWithRessExists = false;
@@ -344,21 +310,8 @@ void setBoxCompletate() {
       if (ballExists && cubeExists) rowForm[i] = CUBE_WITH_RECESS_OBJ;
       else if (ballExists && cubeWithRessExists) rowForm[i] = CUBE_OBJ;
       else if (cubeExists && cubeWithRessExists) rowForm[i] = BALL_OBJ;
-      /*else if (ballExists) { // Если камера увидила один, то получается надо нарандомить другие
-        rowForm[i] = random(CUBE_OBJ, CUBE_WITH_RECESS_OBJ + 1);
-      } else if (cubeExists) { // Рандомим, если у нас один зелёный
-        int tmpRandForm = 0;
-        while (true) {
-          tmpRandForm = random(BALL_OBJ, CUBE_WITH_RECESS_OBJ + 1);
-          if (tmpRandForm != CUBE_OBJ) break;
-        }
-        rowForm[i] = tmpRandForm;
-      } if (cubeWithRessExists) { // Рандомим, если у нас один синий
-        rowForm[i] = random(BALL_OBJ, CUBE_OBJ + 1);
-      }*/
     }
   }
-  //////
  
   // Генерируем необходимое решение для сборки - boxCompletateSolve
   for (int i = 0; i < 3; i++) { // Проходимся по строкам
@@ -375,7 +328,7 @@ void setBoxCompletate() {
       else if (columnColor[j] == BLUE_OBJ && rowForm[i] == CUBE_WITH_RECESS_OBJ) boxCompletateSolve[i][j] = B_CUBE_WITH_RECESS_TYPE; // Если цвет 3 и форма 3, то это синий куб с выемкой
     }
   }
-  Serial.println("BoxCompletateSolve:");
+  Serial.println("Box Completate Solve:");
   for (int i = 0; i < 3; i++) { // Проходимся по строкам хранилища
     for (int j = 0; j < 3; j++) { // Проходимся по столбцам хранилища
       Serial.print(boxCompletateSolve[i][j]);
@@ -385,37 +338,36 @@ void setBoxCompletate() {
   }
 }
 
-// Возвращение (поиск) на домашнюю позициию
-void searchStartPos() {
+// Возвращение на домашнюю позициию
+void SearchStartPos() {
   do {
     while (!yStartlimitSwitch.touched()) { // По y сместиться в крайнюю позицию
       stepperX.setSpeed(STEPPERS_MAX_SPEED); stepperY.setSpeed(STEPPERS_MAX_SPEED);
       stepperX.runSpeed(); stepperY.runSpeed();
     }
-    ////
     while (!xStartlimitSwitch.touched()) { // По x сместиться в крайнюю позицию
       stepperX.setSpeed(STEPPERS_MAX_SPEED); stepperY.setSpeed(-STEPPERS_MAX_SPEED);
       stepperX.runSpeed(); stepperY.runSpeed();
     }
-  } while (!yStartlimitSwitch.touched() && !xStartlimitSwitch.touched()); // Пока 2 концевика не сработали
-  
+  } while (!xStartlimitSwitch.touched() && !yStartlimitSwitch.touched()); // Пока 2 концевика не сработали
   stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0); // Установить позиции 0, 0
   Serial.println("x, y = 0, 0");
 }
 
 // Перемещение на позицию каретки
-void moveCoreXY(String kinematic, int x, int y) {
+void MoveToPosCoreXY(int x, int y) {
   int* motPos = new int[2];
-  if (kinematic == "IK") motPos = IK_CoreXY(x, y);
-  else if (kinematic == "FK") motPos = FK_CoreXY(x, y);
-  // Перемещаем
+  motPos = IK_CoreXY(x, y); // Считаем обратную кинематику
+  motPos[0] = constrain(motPos[0], 0, MAX_X_DIST_MM); // Ограничиваем максимальную позицию по X
+  motPos[1] = constrain(motPos[1], 0, MAX_Y_DIST_MM); // Ограничиваем максимальную позицию по Y
   while (true) { // Перемещаем моторы в позицию
     stepperX.moveTo(motPos[0]); stepperY.moveTo(motPos[1]);
     stepperX.run(); stepperY.run();
     if (!stepperX.isRunning() && !stepperY.isRunning()) break; // Мотор остановился выполнив перемещение
-  }
-  if (xStartlimitSwitch.touched() && yStartlimitSwitch.touched()) { // Если позиция была указана 0, 0 то по окончанию обновить стартовую позицию
-    stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0);
+    if (xStartlimitSwitch.touched() && yStartlimitSwitch.touched()) { // Сработали концевики
+      stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0); // Обнулить
+      break; // Выйти из цикла перемещения
+    }
   }
 }
 
@@ -442,20 +394,20 @@ int* IK_CoreXY(float x, float y) {
 }
 
 // Управление по Z
-void controlZ(short pos) {
+void ControlZ(short pos, int delayTime) {
   servoZ.write(pos);
-  delay(100);
+  delay(delayTime);
 }
 
 // Управление инструментом
-void controlTool(short pos) {
+void ControlTool(short pos, int delayTime) {
   servoTool.write(pos);
-  delay(100);
+  delay(delayTime);
 }
 
 // Управление из Serial
-void manualControl(int type) {
-  int* motPos = new int[2];
+void ManualControl(int type) {
+  //int* motPos = new int[2]; // Это для чео тут?
   while (true) {
     String command = Serial.readStringUntil('\n'); // Считываем из Serial строку до символа переноса на новую строку
     command.trim(); // Чистим символы
@@ -463,19 +415,19 @@ void manualControl(int type) {
       char strBuffer[11] = {};
       command.toCharArray(strBuffer, 11);
       // Считываем x и y разделённых пробелом
-      int val1 = atoi(strtok(strBuffer, " "));
-      int val2 = atoi(strtok(NULL, " "));
-      if (type == 1) {
-        if (val2 <= MAX_X_DIST_MM && val2 >= 0 && val2 <= MAX_Y_DIST_MM && val2 >= 0) {
-          Serial.print("xVal: "); Serial.print(val1); Serial.print(", "); Serial.print("yVal: "); Serial.println(val2);
-          Serial.print("motPos0: "); Serial.print(motPos[0]); Serial.print(", "); Serial.print("motPos1: "); Serial.println(motPos[1]);
-          moveCoreXY("IK", val1, val2);
-        }
-      } else if (type == 2) {
-        Serial.print("val1: "); Serial.print(val1); Serial.print(", "); Serial.print("val2: "); Serial.println(val2);
-        Serial.print("motPos0: "); Serial.print(motPos[0]); Serial.print(", "); Serial.print("motPos1: "); Serial.println(motPos[1]);
-        Serial.print("cellsPosX: "); Serial.print(cellsPosX[val1]); Serial.print(", "); Serial.print("cellsPosY: "); Serial.println(cellsPosY[val2]);
-        moveCoreXY("IK", cellsPosX[val2], cellsPosY[val1]);
+      int value1 = atoi(strtok(strBuffer, " "));
+      int value2 = atoi(strtok(NULL, " "));
+      if (type == 1) { // Тип работы по координатам X и Y
+        value1 = constrain(value1, 0, MAX_X_DIST_MM); // Ограничиваем по X
+        value2 = constrain(value2, 0, MAX_Y_DIST_MM); // Ограничиваем по Y
+        Serial.print("xVal: "); Serial.print(value1); Serial.print(", "); Serial.print("yVal: "); Serial.println(value2);
+        //Serial.print("motPos0: "); Serial.print(motPos[0]); Serial.print(", "); Serial.print("motPos1: "); Serial.println(motPos[1]); // Это для чео тут?
+        MoveToPosCoreXY(value1, value2);
+      } else if (type == 2) { // Тип работы по ячейкам
+        Serial.print("i: "); Serial.print(value1); Serial.print(", "); Serial.print("j: "); Serial.println(value2);
+        //Serial.print("motPos0: "); Serial.print(motPos[0]); Serial.print(", "); Serial.print("motPos1: "); Serial.println(motPos[1]); // Это для чео тут?
+        Serial.print("cellsPosX: "); Serial.print(cellsPosX[value1]); Serial.print(", "); Serial.print("cellsPosY: "); Serial.println(cellsPosY[value2]);
+        MoveToPosCoreXY(cellsPosX[value2], cellsPosY[value1]);
       }
     }
   }
