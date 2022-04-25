@@ -32,10 +32,6 @@
 #define BUZZER_PORT PORT_4 // Порт пьезопищалки
 #define BUZZER_SLOT SLOT_1 // Слот пьезопищалки, работает только во втором
 
-#define RGB_PORT PORT_4 // Порт RGB ленты
-#define RGB_SLOT SLOT_2 // Слот RGB ленты, работает только во втором
-#define RGB_LED_NUM 4 // Количество светодиодов в ленте
-
 // Шаговые двигатели X, Y
 #define STEPPER_X_DIR_PIN mePort[PORT_1].s1
 #define STEPPER_X_STP_PIN mePort[PORT_1].s2
@@ -68,8 +64,6 @@ MeLimitSwitch xStartlimitSwitch(LIMIT_SWITCH_X_START_PORT, LIMIT_SWITCH_X_START_
 MeLimitSwitch yStartlimitSwitch(LIMIT_SWITCH_Y_START_PORT, LIMIT_SWITCH_Y_START_SLOT);
 
 MeBuzzer buzzer(BUZZER_PORT, BUZZER_SLOT); // Пьезопищалка
-
-MeRGBLed led(RGB_PORT, RGB_SLOT); // RGB лента
 
 // Шаговые двигатели
 AccelStepper stepperX(AccelStepper::DRIVER, STEPPER_X_STP_PIN, STEPPER_X_DIR_PIN);
@@ -120,15 +114,13 @@ void setup() {
   //controlZ(135); // 130, 0
   controlTool(0); // 0 - выпущено, 180 - внутри
   buzzer.noTone();
-  led.setNumber(RGB_LED_NUM); // Колпчество светодиодов в ленте
-  for (int i = 0; i < RGB_LED_NUM; i++) indicator(i, false); // Выключаем все светодиодыs
   trackingCam.init(51, 100000); // cam_id - 1..127, default 51; speed - 100000/400000, cam enables auto detection of master clock
   //delay(5000);
 }
 
 void loop() {
-  //searchStartPos(); // Вернуться на базу и установить 0-е позиции
-  //manualControl(1); // Ручное управление
+  searchStartPos(); // Вернуться на базу и установить 0-е позиции
+  manualControl(2); // Ручное управление
   //moveCoreXY("IK", MAX_X_DIST_MM, MAX_Y_DIST_MM);
   searchFromCamObj();
   //mySolve();
@@ -199,33 +191,17 @@ void searchFromCamObj() {
   Serial.println();
 }
 
-void indicator(short i, bool state) {
-  if (state) led.setColorAt(i, 255, 0, 0); // Включаем красным выбранный
-  else led.setColorAt(i, 0, 0, 1); // Ставим синим выбранный
-  led.show();
-}
-
 void searchStartPos() { // Возвращение (поиск) на домашнюю позициию
   do {
-    while (!yStartlimitSwitch.touched()) { // По y сместиться в крайнюю позицию
+    while (!xStartlimitSwitch.touched()) { // По y сместиться в крайнюю позицию
       stepperX.setSpeed(STEPPERS_MAX_SPEED); stepperY.setSpeed(STEPPERS_MAX_SPEED);
       stepperX.runSpeed(); stepperY.runSpeed();
     }
-    if (yStartlimitSwitch.touched()) indicator(0, true); // Включаем светодиоды нулевого положения
-    else indicator(0, false); // Иначе выключаем
-    ////
-    while (!xStartlimitSwitch.touched()) { // По x сместиться в крайнюю позицию
+    while (!yStartlimitSwitch.touched()) { // По y сместиться в крайнюю позицию
       stepperX.setSpeed(STEPPERS_MAX_SPEED); stepperY.setSpeed(-STEPPERS_MAX_SPEED);
       stepperX.runSpeed(); stepperY.runSpeed();
     }
-    if (xStartlimitSwitch.touched()) indicator(1, true); // Включаем светодиоды нулевого положения
-    else indicator(1, false); // Иначе выключаем
-  } while (!yStartlimitSwitch.touched() && !xStartlimitSwitch.touched()); // Пока 2 концевика не сработали
-  
-  // Включаем светодиоды нулевого положения
-  if (yStartlimitSwitch.touched()) indicator(0, true);
-  if (xStartlimitSwitch.touched()) indicator(1, true);
-  
+  } while (!yStartlimitSwitch.touched() && !xStartlimitSwitch.touched()); // Пока 2 концевика не сработали  
   stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0); // Установить позиции 0, 0
   Serial.println("x, y = 0, 0");
 }
@@ -238,12 +214,6 @@ void moveCoreXY(String type, int x, int y) {
     while (true) { // Перемещаем моторы в позицию
       stepperX.moveTo(motPos[0]); stepperY.moveTo(motPos[1]);
       stepperX.run(); stepperY.run();
-      // Включаем/выключаем светодиоды нулевого положения
-      if (yStartlimitSwitch.touched()) indicator(0, true);
-      else indicator(0, false);
-      if (xStartlimitSwitch.touched()) indicator(1, true);
-      else indicator(1, false);
-      ////
       if (!stepperX.isRunning() && !stepperY.isRunning()) break; // Мотор остановился выполнив перемещение
     }
   } else if (type == "FK") {
@@ -251,7 +221,6 @@ void moveCoreXY(String type, int x, int y) {
   }
   if (xStartlimitSwitch.touched() && yStartlimitSwitch.touched()) { // Если позиция была указана 0, 0 то по окончанию обновить стартовую позицию
     stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0);
-    indicator(0, true); indicator(1, true);
   }
 }
 
@@ -315,17 +284,11 @@ void manualControl(int type) {
       while (true) { // Перемещаем моторы в позицию
         stepperX.moveTo(motPos[0]); stepperY.moveTo(motPos[1]);
         stepperX.run(); stepperY.run();
-        // Включаем/выключаем светодиоды нулевого положения
-        if (yStartlimitSwitch.touched()) indicator(0, true);
-        else indicator(0, false);
-        if (xStartlimitSwitch.touched()) indicator(1, true);
-        else indicator(1, false);
         ////
         if (!stepperX.isRunning() && !stepperY.isRunning()) break; // Мотор остановился выполнив перемещение
       }
       if (xStartlimitSwitch.touched() && yStartlimitSwitch.touched()) { // Если позиция была указана 0, 0 то по окончанию обновить стартовую позицию
         stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0);
-        indicator(0, true); indicator(1, true);
       }*/
     }
   }
