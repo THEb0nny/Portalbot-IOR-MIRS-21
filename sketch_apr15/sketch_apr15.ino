@@ -24,20 +24,17 @@
 #include "TrackingCamI2C.h" // Обрезанная версия, чтобы хватало динамической памяти
 #include "GyverTimer.h"
 
-#define LIMIT_SWITCH_X_START_PORT PORT_3 // Порт ближних концевиков к моторам по Y
-#define LIMIT_SWITCH_X_START_SLOT SLOT_1 // Слот ближних концевиков к моторам по Y
+#define LIMIT_SWITCH_X_START_PORT PORT_3 // Порт концевика по X
+#define LIMIT_SWITCH_X_START_SLOT SLOT_1 // Слот концевика по X
 
-#define LIMIT_SWITCH_Y_START_PORT PORT_3 // Порт концевика для коретки со стороны мотора X
-#define LIMIT_SWITCH_Y_START_SLOT SLOT_2 // Слот концевика для коретки со стороны мотора X
+#define LIMIT_SWITCH_Y_START_PORT PORT_3 // Порт концевика по Y
+#define LIMIT_SWITCH_Y_START_SLOT SLOT_2 // Слот концевика по Y
 
-#define SERVO_Z_PIN A2 // Пин серво для перемещения по Z
+#define SERVO_Z_PIN A2 // Пин серво Z
 #define SERVO_TOOL_PIN A3 // Пин серво инструмента
 
 #define MAX_X_DIST_MM 140 // Максимальная дистанция по X для перемещения в мм
 #define MAX_Y_DIST_MM 145 // Максимальная дистанция по Y для перемещения в мм
-
-#define BUZZER_PORT PORT_4 // Порт пьезопищалки
-#define BUZZER_SLOT SLOT_1 // Слот пьезопищалки
 
 // Порты подключнния шаговых двигателей
 #define STEPPER_X_DIR_PIN mePort[PORT_1].s1
@@ -51,7 +48,7 @@
 #define DIST_MM_PER_STEP_X 0.04 // Дистанция в мм за прохождение 1 шага мотора X
 #define DIST_MM_PER_STEP_Y 0.04 // Дистанция в мм за прохождение 1 шага мотора X
 
-// Номера типов фигур по настройкам камеры
+// Номера фигур по настройкам камеры
 #define R_BALL_TYPE 0
 #define G_BALL_TYPE 1
 #define B_BALL_TYPE 2
@@ -80,10 +77,15 @@
 #define TIME_TO_READ_FROM_CAM 5000 // Время для считываения с камеры
 #define MAX_CAM_BLOBS_READ 10 // Максимальное смчитывание блобсов за один раз
 
+#define SERVO_Z_UP 45 // Значение, когда Z поднято
+#define SERVO_Z_DOWN 160 // Значение, когда Z опущено
+
+#define SERVO_TOOL_UP 140 // Инструмент поднят
+#define SERVO_TOOL_DOWN 20 // Инструмент выпущен
+
+// Концевики
 MeLimitSwitch xStartlimitSwitch(LIMIT_SWITCH_X_START_PORT, LIMIT_SWITCH_X_START_SLOT);
 MeLimitSwitch yStartlimitSwitch(LIMIT_SWITCH_Y_START_PORT, LIMIT_SWITCH_Y_START_SLOT);
-
-MeBuzzer buzzer(BUZZER_PORT, BUZZER_SLOT); // Пьезопищалка
 
 // Шаговые двигатели
 AccelStepper stepperX(AccelStepper::DRIVER, STEPPER_X_STP_PIN, STEPPER_X_DIR_PIN);
@@ -116,7 +118,7 @@ const int cellsPosY[XY_CELLS_ARR_LEN] = {135, 103, 72, 38, 8}; // Координ
 const int storagesCellsCamPosX[XY_CELLS_ARR_LEN] = {70, 104, 139, 175, 209};
 const int storagesCellsCamPosY[XY_CELLS_ARR_LEN] = {23, 56, 92, 128, 162};
 
-float x, y, lx, ly; // Глобальные переменные координат для работы с перемещением по X, Y кинематики CoreXY
+float x, y, lx, ly; // Глобальные переменные координат по X, Y кинематики CoreXY
 
 void setup() {
   Serial.begin(115200);
@@ -126,30 +128,15 @@ void setup() {
   stepperX.setAcceleration(STEPPERS_ACCEL); stepperY.setAcceleration(STEPPERS_ACCEL); // Установка ускорения, в шагах в секунду за секунду
   servoZ.attach(SERVO_Z_PIN); // Подключаем серво Z
   servoTool.attach(SERVO_TOOL_PIN); // Подключаем серво инструмента
-  buzzer.noTone();
-  ControlZ(40, 0); // Поднимаем Z
-  ControlTool(180, 0); // Поднимаем инструмент
-  trackingCam.init(51, 100000); // cam_id - 1..127, default 51; speed - 100000/400000, cam enables auto detection of master clock
+  ControlZ(SERVO_Z_UP, 0); // Поднимаем Z
+  ControlTool(SERVO_TOOL_UP, 0); // Поднимаем инструмент
+  trackingCam.init(51, 100000); // cam_id - 1..127, default 51; speed - 100000/400000
 }
 
-//controlTool(180); // 180 - поднято, 30 - опущено максимально
-//controlZ(180); // 40 - поднятно, 180 - опущено
-
 void loop() {
+  SearchStartPos(); // Вернуться на базу и установить нулевую позицию
+  ManualControl(2); // Ручное управление
   /*
-  controlTool(30); // Опускаем
-  delay(1500);
-  controlZ(150); // Опускаем
-  delay(1500);
-  controlZ(40); // Поднимаем
-  delay(1500);
-  controlZ(150); // Опускаем
-  delay(1500);
-  controlTool(180); // Поднимаем
-  delay(1500);
-  */
-  SearchStartPos(); // Вернуться на базу и установить 0-е позиции
-  //ManualControl(2); // Ручное управление
   MoveToPosCoreXY(cellsPosX[0], cellsPosY[0]); // Чтобы не сбить столбик из жёлтых фигур перемещаемся не сразу по диагонали
   MoveToPosCoreXY(MAX_X_DIST_MM, MAX_Y_DIST_MM); // Перемещаемся в крайнюю точку, чтобы считывать с камеры
   SearchFromCamObj(); // Ищем с камеры объекты
@@ -157,7 +144,8 @@ void loop() {
   Solve(); // Решаем задачу
   SearchStartPos(); // Возвращаемся в нулевую точку после выполнения
   buzzer.tone(255, 5000); // Пищим о завершении
-  while(true) { delay(100); } // Конец выполнения
+  while(true); // Конец выполнения
+  */
 }
 
 // Моё решение
@@ -341,12 +329,12 @@ void SetBoxCompletate() {
 // Возвращение на домашнюю позициию
 void SearchStartPos() {
   do {
-    while (!yStartlimitSwitch.touched()) { // По y сместиться в крайнюю позицию
-      stepperX.setSpeed(STEPPERS_MAX_SPEED); stepperY.setSpeed(STEPPERS_MAX_SPEED);
+    while (!yStartlimitSwitch.touched()) { // По x сместиться в крайнюю позицию
+      stepperX.setSpeed(STEPPERS_MAX_SPEED); stepperY.setSpeed(-STEPPERS_MAX_SPEED);
       stepperX.runSpeed(); stepperY.runSpeed();
     }
-    while (!xStartlimitSwitch.touched()) { // По x сместиться в крайнюю позицию
-      stepperX.setSpeed(STEPPERS_MAX_SPEED); stepperY.setSpeed(-STEPPERS_MAX_SPEED);
+    while (!xStartlimitSwitch.touched()) { // По y сместиться в крайнюю позицию
+      stepperX.setSpeed(STEPPERS_MAX_SPEED); stepperY.setSpeed(STEPPERS_MAX_SPEED);
       stepperX.runSpeed(); stepperY.runSpeed();
     }
   } while (!xStartlimitSwitch.touched() && !yStartlimitSwitch.touched()); // Пока 2 концевика не сработали
@@ -358,16 +346,13 @@ void SearchStartPos() {
 void MoveToPosCoreXY(int x, int y) {
   int* motPos = new int[2];
   motPos = IK_CoreXY(x, y); // Считаем обратную кинематику
-  motPos[0] = constrain(motPos[0], 0, MAX_X_DIST_MM); // Ограничиваем максимальную позицию по X
-  motPos[1] = constrain(motPos[1], 0, MAX_Y_DIST_MM); // Ограничиваем максимальную позицию по Y
   while (true) { // Перемещаем моторы в позицию
     stepperX.moveTo(motPos[0]); stepperY.moveTo(motPos[1]);
     stepperX.run(); stepperY.run();
     if (!stepperX.isRunning() && !stepperY.isRunning()) break; // Мотор остановился выполнив перемещение
-    if (xStartlimitSwitch.touched() && yStartlimitSwitch.touched()) { // Сработали концевики
-      stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0); // Обнулить
-      break; // Выйти из цикла перемещения
-    }
+  }
+  if (xStartlimitSwitch.touched() && yStartlimitSwitch.touched()) { // Сработали концевики, значит мы на нулевой позии
+    stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0); // Обнулить
   }
 }
 
@@ -407,27 +392,44 @@ void ControlTool(short pos, int delayTime) {
 
 // Управление из Serial
 void ManualControl(int type) {
-  //int* motPos = new int[2]; // Это для чео тут?
+  int x = 0, y = 0, row, col, z, tool;
   while (true) {
     String command = Serial.readStringUntil('\n'); // Считываем из Serial строку до символа переноса на новую строку
     command.trim(); // Чистим символы
     if (command.length() > 0) { // Если есть доступные данные
-      char strBuffer[11] = {};
-      command.toCharArray(strBuffer, 11);
-      // Считываем x и y разделённых пробелом
+      char strBuffer[11]; // Создаём пустой массив символов
+      command.toCharArray(strBuffer, 11); // Перевести строку в массив символов
+      // Считываем x и y разделённых пробелом, а также Z и инструментом
       int value1 = atoi(strtok(strBuffer, " "));
       int value2 = atoi(strtok(NULL, " "));
+      String value3 = String(strtok(NULL, " "));
+      String value4 = String(strtok(NULL, " "));
+      Serial.print(value1); Serial.print(" "); Serial.print(value2); Serial.print(" "); Serial.print(value3);  Serial.print(" "); Serial.println(value4);
       if (type == 1) { // Тип работы по координатам X и Y
-        value1 = constrain(value1, 0, MAX_X_DIST_MM); // Ограничиваем по X
-        value2 = constrain(value2, 0, MAX_Y_DIST_MM); // Ограничиваем по Y
-        Serial.print("xVal: "); Serial.print(value1); Serial.print(", "); Serial.print("yVal: "); Serial.println(value2);
-        //Serial.print("motPos0: "); Serial.print(motPos[0]); Serial.print(", "); Serial.print("motPos1: "); Serial.println(motPos[1]); // Это для чео тут?
-        MoveToPosCoreXY(value1, value2);
+        if (value1 != 0) x = constrain(value1, 0, MAX_X_DIST_MM); // Записываем X и ограничиваем её
+        if (value2 != 0) y = constrain(value2, 0, MAX_Y_DIST_MM); // Записываем Y и ограничиваем её
+        Serial.print("xVal: "); Serial.print(x); Serial.print(", "); Serial.print("yVal: "); Serial.println(y);
+        MoveToPosCoreXY(x, y);
       } else if (type == 2) { // Тип работы по ячейкам
-        Serial.print("i: "); Serial.print(value1); Serial.print(", "); Serial.print("j: "); Serial.println(value2);
-        //Serial.print("motPos0: "); Serial.print(motPos[0]); Serial.print(", "); Serial.print("motPos1: "); Serial.println(motPos[1]); // Это для чео тут?
-        Serial.print("cellsPosX: "); Serial.print(cellsPosX[value1]); Serial.print(", "); Serial.print("cellsPosY: "); Serial.println(cellsPosY[value2]);
-        MoveToPosCoreXY(cellsPosX[value2], cellsPosY[value1]);
+        row = constrain(value1, 0, 4); // Считываем номер строки и ограничиваем
+        col = constrain(value2, 0, 4); // Считываем номер столбца и ограничиваем
+        Serial.print("row: "); Serial.print(row); Serial.print(", "); Serial.print("col: "); Serial.println(col);
+        Serial.print("cellsPosX: "); Serial.print(cellsPosX[row]); Serial.print(", "); Serial.print("cellsPosY: "); Serial.println(cellsPosY[col]);
+        MoveToPosCoreXY(cellsPosX[col], cellsPosY[row]);
+      }
+      // Управляем Z
+      if (value3 == "zu") ControlZ(SERVO_Z_UP, 500); // Если команда zu
+      else if (value3 == "zd") ControlZ(SERVO_Z_DOWN, 500); // Если команда zd
+      else if (value3 != "") { // Если не пустота, то выставляем позицию
+        z = constrain(value3.toInt(), 0, 270);
+        ControlZ(z, 1000);
+      }
+      // Управляем Tool
+      if (value4 == "tu") ControlTool(SERVO_TOOL_UP, 500); // Если команда tu
+      else if (value4 == "td") ControlTool(SERVO_TOOL_DOWN, 500); // Если команда td
+      else if (value3 != "") { // Если не пустота, то выставляем позицию
+        tool = constrain(value4.toInt(), 0, 270);
+        ControlTool(tool, 1000);
       }
     }
   }
