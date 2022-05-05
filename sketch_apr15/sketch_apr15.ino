@@ -201,7 +201,8 @@ void searchStartPos() { // Возвращение (поиск) на домашн
       stepperX.setSpeed(STEPPERS_MAX_SPEED); stepperY.setSpeed(-STEPPERS_MAX_SPEED);
       stepperX.runSpeed(); stepperY.runSpeed();
     }
-  } while (!yStartlimitSwitch.touched() && !xStartlimitSwitch.touched()); // Пока 2 концевика не сработали  
+  } while (!yStartlimitSwitch.touched() && !xStartlimitSwitch.touched()); // Пока 2 концевика не сработали
+  stepperX.stop(); stepperY.stop(); // Остановить моторы
   stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0); // Установить позиции 0, 0
   Serial.println("x, y = 0, 0");
 }
