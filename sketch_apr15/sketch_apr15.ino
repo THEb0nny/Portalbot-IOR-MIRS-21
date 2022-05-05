@@ -1,4 +1,4 @@
-// http://forum.amperka.ru/threads/%D0%91%D0%B8%D0%B1%D0%BB%D0%B8%D0%BE%D1%82%D0%B5%D0%BA%D0%B0-accelstepper.11388/
+// http://forum.amperka.ru/threads/%D0%91%D0%B8%D0%B1%D0%BB%D0%B8%D0%BE%D1%82%D0%B5%D0%BA%D0%B0-accelstepper.11388/#post-132258
 // http://www.airspayce.com/mikem/arduino/AccelStepper/index.html
 // http://learn.makeblock.com/Makeblock-library-for-Arduino/class_me_port.html
 // http://learn.makeblock.com/en/Makeblock-library-for-Arduino/class_me_limit_switch.html
@@ -351,7 +351,8 @@ void MoveToPosCoreXY(int x, int y) {
     stepperX.run(); stepperY.run();
     if (!stepperX.isRunning() && !stepperY.isRunning()) break; // Мотор остановился выполнив перемещение
   }
-  stepperX.stop(); stepperY.stop(); // Остановить моторы
+  //stepperX.stop(); stepperY.stop(); // Остановить моторы
+  stepperX.disableOutputs(); stepperY.disableOutputs();
   if (xStartlimitSwitch.touched() && yStartlimitSwitch.touched()) { // Сработали концевики, значит мы на нулевой позии
     stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0); // Обнулить
   }
