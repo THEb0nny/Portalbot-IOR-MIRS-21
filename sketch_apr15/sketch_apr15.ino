@@ -329,12 +329,12 @@ void SetBoxCompletate() {
 // Возвращение на домашнюю позициию
 void SearchStartPos() {
   do {
+    stepperX.setSpeed(STEPPERS_MAX_SPEED); stepperY.setSpeed(-STEPPERS_MAX_SPEED); // Установить скорости, а почему только тут?
     while (!yStartlimitSwitch.touched()) { // По x сместиться в крайнюю позицию
-      stepperX.setSpeed(STEPPERS_MAX_SPEED); stepperY.setSpeed(-STEPPERS_MAX_SPEED);
       stepperX.runSpeed(); stepperY.runSpeed();
     }
+    stepperX.setSpeed(STEPPERS_MAX_SPEED); stepperY.setSpeed(STEPPERS_MAX_SPEED); // Установить скорости, а почему только тут?
     while (!xStartlimitSwitch.touched()) { // По y сместиться в крайнюю позицию
-      stepperX.setSpeed(STEPPERS_MAX_SPEED); stepperY.setSpeed(STEPPERS_MAX_SPEED);
       stepperX.runSpeed(); stepperY.runSpeed();
     }
   } while (!xStartlimitSwitch.touched() && !yStartlimitSwitch.touched()); // Пока 2 концевика не сработали
@@ -351,6 +351,7 @@ void MoveToPosCoreXY(int x, int y) {
     stepperX.run(); stepperY.run();
     if (!stepperX.isRunning() && !stepperY.isRunning()) break; // Мотор остановился выполнив перемещение
   }
+  stepperX.stop(); stepperY.stop(); // Остановить моторы
   if (xStartlimitSwitch.touched() && yStartlimitSwitch.touched()) { // Сработали концевики, значит мы на нулевой позии
     stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0); // Обнулить
   }
