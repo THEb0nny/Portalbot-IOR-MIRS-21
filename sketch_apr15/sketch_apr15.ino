@@ -2,6 +2,7 @@
 // http://www.airspayce.com/mikem/arduino/AccelStepper/index.html
 // http://learn.makeblock.com/Makeblock-library-for-Arduino/class_me_port.html
 // http://learn.makeblock.com/en/Makeblock-library-for-Arduino/class_me_limit_switch.html
+// http://docs.makeblock.com/diy-platform/en/electronic-modules/motor-drivers/me-stepper-driver.html
 // https://www.marginallyclever.com/2015/01/adapting-makelangelo-corexy-kinematics/
 // http://wiki.neobot.ru/index.php?title=%D0%A1%D0%B2%D0%B5%D1%82%D0%BE%D0%B4%D0%B8%D0%BE%D0%B4%D0%BD%D0%B0%D1%8F_%D0%BB%D0%B5%D0%BD%D1%82%D0%B0/LED_RGB_Strip-Addressable,_Sealed
 // https://community.alexgyver.ru/resources/biblioteka-gyvertimer.11/
@@ -126,6 +127,7 @@ void setup() {
   Serial.println();
   stepperX.setMaxSpeed(STEPPERS_MAX_SPEED); stepperY.setMaxSpeed(STEPPERS_MAX_SPEED); // Установка максимальной скорости (оборотов в минуту). При движении шаговый двигатель будет ускоряться до этой максимальной скорости и замедляться при подходе к концу движения
   stepperX.setAcceleration(STEPPERS_ACCEL); stepperY.setAcceleration(STEPPERS_ACCEL); // Установка ускорения, в шагах в секунду за секунду
+  //stepperX.setEnablePin(номер вашего пина); stepperY.setEnablePin(номер вашего пина); // Для функции disableOutputs()
   servoZ.attach(SERVO_Z_PIN); // Подключаем серво Z
   servoTool.attach(SERVO_TOOL_PIN); // Подключаем серво инструмента
   ControlZ(SERVO_Z_UP, 0); // Поднимаем Z
