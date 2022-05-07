@@ -25,6 +25,8 @@
 #include "TrackingCamI2C.h" // Обрезанная версия, чтобы хватало динамической памяти
 #include "GyverTimer.h"
 
+#define MAX_INPUT_VAL_IN_MANUAL_CONTROL 4 // Максимальное количество значений в строку монитора порта при ручном управлении
+
 #define LIMIT_SWITCH_X_START_PORT PORT_3 // Порт концевика по X
 #define LIMIT_SWITCH_X_START_SLOT SLOT_1 // Слот концевика по X
 
@@ -43,7 +45,8 @@
 #define STEPPER_Y_DIR_PIN mePort[PORT_2].s1
 #define STEPPER_Y_STP_PIN mePort[PORT_2].s2
 
-#define STEPPER_DRIVER_SLP_PIN 2 // ToDO Пин, который включает/отключает шаговый двигатель
+#define STEPPER_X_DRV_SLP_PIN 9 // Пин, который включает/выключает шаговый двигатель
+#define STEPPER_Y_DRV_SLP_PIN 10 // Пин, который включает/выключает шаговый двигатель
 #define STEPPERS_MAX_SPEED 2000 // Максимальная скорость шагового двигателя
 #define STEPPERS_ACCEL 15000 // Ускорение шагового двигателя
 #define STEP_TO_ROTATION 400 // Шагов за оборот - 360 градусов
@@ -128,7 +131,7 @@ void setup() {
   Serial.println();
   stepperX.setMaxSpeed(STEPPERS_MAX_SPEED); stepperY.setMaxSpeed(STEPPERS_MAX_SPEED); // Установка максимальной скорости (оборотов в минуту). При движении шаговый двигатель будет ускоряться до этой максимальной скорости и замедляться при подходе к концу движения
   stepperX.setAcceleration(STEPPERS_ACCEL); stepperY.setAcceleration(STEPPERS_ACCEL); // Установка ускорения, в шагах в секунду за секунду
-  //stepperX.setEnablePin(номер вашего пина); stepperY.setEnablePin(номер вашего пина); // Для функции disableOutputs()
+  stepperX.setEnablePin(STEPPER_X_DRV_SLP_PIN); stepperY.setEnablePin(STEPPER_Y_DRV_SLP_PIN); // Подключить пины включения/выключения шаговых двигателей
   servoZ.attach(SERVO_Z_PIN); // Подключаем серво Z
   servoTool.attach(SERVO_TOOL_PIN); // Подключаем серво инструмента
   ControlZ(SERVO_Z_UP, 0); // Поднимаем Z
@@ -397,31 +400,47 @@ void ControlTool(short pos, int delayTime) {
 
 // Управление из Serial
 void ManualControl(int type) {
-  int x = 0, y = 0, row, col, z, tool;
+  int x, y, row, col, z, tool;
   while (true) {
+    String inputValues[MAX_INPUT_VAL_IN_MANUAL_CONTROL]; // Массив входящей строки
+    String incoming[MAX_INPUT_VAL_IN_MANUAL_CONTROL]; // Массив команд
+    int values[MAX_INPUT_VAL_IN_MANUAL_CONTROL]; // Массив значений
     String command = Serial.readStringUntil('\n'); // Считываем из Serial строку до символа переноса на новую строку
     command.trim(); // Чистим символы
     if (command.length() > 0) { // Если есть доступные данные
       char strBuffer[11]; // Создаём пустой массив символов
       command.toCharArray(strBuffer, 11); // Перевести строку в массив символов
       // Считываем x и y разделённых пробелом, а также Z и инструментом
-      int value1 = atoi(strtok(strBuffer, " "));
-      int value2 = atoi(strtok(NULL, " "));
-      String value3 = String(strtok(NULL, " "));
-      String value4 = String(strtok(NULL, " "));
-      Serial.print(value1); Serial.print(" "); Serial.print(value2); Serial.print(" "); Serial.print(value3);  Serial.print(" "); Serial.println(value4);
+      for (byte i = 0; i < MAX_INPUT_VAL_IN_MANUAL_CONTROL; i++) {
+        inputValues[i] = (i == 0 ? String(strtok(strBuffer, " ")) : String(strtok(NULL, " ")));
+        inputValues[i].replace(" ", ""); // Убрать возможные пробелы между символами
+        Serial.print(inputValues[i]); Serial.print(" ");
+        byte strIndex = inputValues[i].length(); // Переменая для хронения индекса вхождения цифры в входной строке, изначально равна размеру строки
+        for (byte i = 0; i < 10; i++) { // Поиск первого вхождения цифры от 0 по 9 в подстроку
+          byte index = inputValues[i].indexOf(String(i));
+          if (index < strIndex && index != 255) strIndex = index;
+        }
+        incoming[i] = inputValues[i].substring(0, strIndex);
+        values[i] = (inputValues[i].substring(strIndex, inputValues[i].length())).toInt();
+        if (incoming[i] == "x") x = values[i];
+        else if (incoming[i] == "y") y = values[i];
+        else if (incoming[i] == "row") row = constrain(values[i], 0, 4); // Считываем номер строки и ограничиваем 
+        else if (incoming[i] == "col") col = constrain(values[i], 0, 4); // Считываем номер столбца и ограничиваем
+        Serial.print(incoming[i]); Serial.print(" = "); Serial.println(values[i]); // Печать информацию
+      }
       if (type == 1) { // Тип работы по координатам X и Y
-        if (value1 != 0) x = constrain(value1, 0, MAX_X_DIST_MM); // Записываем X и ограничиваем её
-        if (value2 != 0) y = constrain(value2, 0, MAX_Y_DIST_MM); // Записываем Y и ограничиваем её
+        if (value1 != "") x = constrain(value1.toFloat(), 0, MAX_X_DIST_MM); // Записываем X и ограничиваем её
+        if (value2 != "") y = constrain(value2.toFloat(), 0, MAX_Y_DIST_MM); // Записываем Y и ограничиваем её
         Serial.print("xVal: "); Serial.print(x); Serial.print(", "); Serial.print("yVal: "); Serial.println(y);
         MoveToPosCoreXY(x, y);
       } else if (type == 2) { // Тип работы по ячейкам
-        row = constrain(value1, 0, 4); // Считываем номер строки и ограничиваем
-        col = constrain(value2, 0, 4); // Считываем номер столбца и ограничиваем
+        if (value1 != "") row = constrain(value1.toInt(), 0, 4); // Считываем номер строки и ограничиваем
+        if (value2 != "") col = constrain(value2.toInt(), 0, 4); // Считываем номер столбца и ограничиваем
         Serial.print("row: "); Serial.print(row); Serial.print(", "); Serial.print("col: "); Serial.println(col);
         Serial.print("cellsPosX: "); Serial.print(cellsPosX[row]); Serial.print(", "); Serial.print("cellsPosY: "); Serial.println(cellsPosY[col]);
         MoveToPosCoreXY(cellsPosX[col], cellsPosY[row]);
       }
+      /*
       // Управляем Z
       if (value3 == "zu") ControlZ(SERVO_Z_UP, 500); // Если команда zu
       else if (value3 == "zd") ControlZ(SERVO_Z_DOWN, 500); // Если команда zd
@@ -436,6 +455,7 @@ void ManualControl(int type) {
         tool = constrain(value4.toInt(), 0, 270);
         ControlTool(tool, 1000);
       }
+      */
     }
   }
 }
