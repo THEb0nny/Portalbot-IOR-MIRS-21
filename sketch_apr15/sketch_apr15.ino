@@ -43,6 +43,7 @@
 #define STEPPER_Y_DIR_PIN mePort[PORT_2].s1
 #define STEPPER_Y_STP_PIN mePort[PORT_2].s2
 
+#define STEPPER_DRIVER_SLP_PIN 2 // ToDO Пин, который включает/отключает шаговый двигатель
 #define STEPPERS_MAX_SPEED 2000 // Максимальная скорость шагового двигателя
 #define STEPPERS_ACCEL 15000 // Ускорение шагового двигателя
 #define STEP_TO_ROTATION 400 // Шагов за оборот - 360 градусов
