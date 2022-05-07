@@ -140,7 +140,7 @@ void setup() {
 }
 
 void loop() {
-  SearchStartPos(); // Вернуться на базу и установить нулевую позицию
+  //SearchStartPos(); // Вернуться на базу и установить нулевую позицию
   ManualControl(2); // Ручное управление
   /*
   MoveToPosCoreXY(cellsPosX[0], cellsPosY[0]); // Чтобы не сбить столбик из жёлтых фигур перемещаемся не сразу по диагонали
@@ -348,6 +348,18 @@ void SearchStartPos() {
   Serial.println("x, y = 0, 0");
 }
 
+// Управление по Z
+void ControlZ(short pos, int delayTime) {
+  servoZ.write(pos);
+  delay(delayTime);
+}
+
+// Управление инструментом
+void ControlTool(short pos, int delayTime) {
+  servoTool.write(pos);
+  delay(delayTime);
+}
+
 // Перемещение на позицию каретки
 void MoveToPosCoreXY(int x, int y) {
   int* motPos = new int[2];
@@ -386,76 +398,70 @@ int* IK_CoreXY(float x, float y) {
   return return_array;
 }
 
-// Управление по Z
-void ControlZ(short pos, int delayTime) {
-  servoZ.write(pos);
-  delay(delayTime);
-}
-
-// Управление инструментом
-void ControlTool(short pos, int delayTime) {
-  servoTool.write(pos);
-  delay(delayTime);
-}
-
 // Управление из Serial
 void ManualControl(int type) {
-  int x, y, row, col, z, tool;
+  int x = 0, y = 0, row = -1, col = - 1, z, tool;
   while (true) {
     String inputValues[MAX_INPUT_VAL_IN_MANUAL_CONTROL]; // Массив входящей строки
-    String incoming[MAX_INPUT_VAL_IN_MANUAL_CONTROL]; // Массив команд
+    String key[MAX_INPUT_VAL_IN_MANUAL_CONTROL]; // Массив ключей
     int values[MAX_INPUT_VAL_IN_MANUAL_CONTROL]; // Массив значений
-    String command = Serial.readStringUntil('\n'); // Считываем из Serial строку до символа переноса на новую строку
-    command.trim(); // Чистим символы
-    if (command.length() > 0) { // Если есть доступные данные
-      char strBuffer[11]; // Создаём пустой массив символов
-      command.toCharArray(strBuffer, 11); // Перевести строку в массив символов
+    String inputStr = Serial.readStringUntil('\n'); // Считываем из Serial строку до символа переноса на новую строку
+    inputStr.trim(); // Чистим символы
+    if (inputStr.length() > 0) { // Если есть доступные данные
+      char strBuffer[99]; // Создаём пустой массив символов
+      inputStr.toCharArray(strBuffer, 99); // Перевести строку в массив символов
       // Считываем x и y разделённых пробелом, а также Z и инструментом
       for (byte i = 0; i < MAX_INPUT_VAL_IN_MANUAL_CONTROL; i++) {
         inputValues[i] = (i == 0 ? String(strtok(strBuffer, " ")) : String(strtok(NULL, " ")));
         inputValues[i].replace(" ", ""); // Убрать возможные пробелы между символами
-        Serial.print(inputValues[i]); Serial.print(" ");
-        byte strIndex = inputValues[i].length(); // Переменая для хронения индекса вхождения цифры в входной строке, изначально равна размеру строки
+        Serial.print(inputValues[i]? inputValues[i] : "null");
+        if (i < MAX_INPUT_VAL_IN_MANUAL_CONTROL - 1) Serial.print(", ");
+        else Serial.println();
+      }
+      for (byte i = 0; i < MAX_INPUT_VAL_IN_MANUAL_CONTROL; i++) {
+        String inputValue = inputValues[i];
+        byte strIndex = inputValue.length(); // Переменая для хронения индекса вхождения цифры в входной строке, изначально равна размеру строки
         for (byte i = 0; i < 10; i++) { // Поиск первого вхождения цифры от 0 по 9 в подстроку
-          byte index = inputValues[i].indexOf(String(i));
+          byte index = inputValue.indexOf(String(i));
           if (index < strIndex && index != 255) strIndex = index;
         }
-        incoming[i] = inputValues[i].substring(0, strIndex);
-        values[i] = (inputValues[i].substring(strIndex, inputValues[i].length())).toInt();
-        if (incoming[i] == "x") x = values[i];
-        else if (incoming[i] == "y") y = values[i];
-        else if (incoming[i] == "row") row = constrain(values[i], 0, 4); // Считываем номер строки и ограничиваем 
-        else if (incoming[i] == "col") col = constrain(values[i], 0, 4); // Считываем номер столбца и ограничиваем
-        Serial.print(incoming[i]); Serial.print(" = "); Serial.println(values[i]); // Печать информацию
+        key[i] = inputValue.substring(0, strIndex);
+        values[i] = (inputValue.substring(strIndex, inputValue.length())).toInt();
+        if (key[i] == "x") {
+          if (x != values[i]) x = constrain(values[i], 0, MAX_X_DIST_MM); // Записываем X и ограничиваем её
+        } else if (key[i] == "y") {
+          if (y != values[i]) y = constrain(values[i], 0, MAX_Y_DIST_MM); // Записываем Y и ограничиваем её
+        } else if (key[i] == "r") {
+          if (row != values[i]) row = constrain(values[i], 0, 4); // Считываем номер строки и ограничиваем 
+        } else if (key[i] == "c") {
+          if (col != values[i]) col = constrain(values[i], 0, 4); // Считываем номер столбца и ограничиваем
+        } else if (key[i] == "zu") {
+          z = SERVO_Z_UP;
+        } else if (key[i] == "zd") {
+          z = SERVO_Z_DOWN;
+        } else if (key[i] == "z") {
+          if (z != values[i]) z = constrain(z, 0, 270); // Записываем z и ограничиваем её
+        } else if (key[i] == "tu") {
+          tool = SERVO_TOOL_UP;
+        } else if (key[i] == "td") {
+          tool = SERVO_TOOL_DOWN;
+        } else if (key[i] == "t") {
+          if (tool != values[i]) tool = constrain(tool, 0, 270); // Записываем t и ограничиваем её
+        }
+        if (key[i].length() > 0) {
+          Serial.print(key[i]); Serial.print(" = "); Serial.println(values[i]); // Печать ключ и значение, если ключ существует
+        }
       }
       if (type == 1) { // Тип работы по координатам X и Y
-        if (value1 != "") x = constrain(value1.toFloat(), 0, MAX_X_DIST_MM); // Записываем X и ограничиваем её
-        if (value2 != "") y = constrain(value2.toFloat(), 0, MAX_Y_DIST_MM); // Записываем Y и ограничиваем её
-        Serial.print("xVal: "); Serial.print(x); Serial.print(", "); Serial.print("yVal: "); Serial.println(y);
+        Serial.print("xVal: "); Serial.print(x); Serial.print(", "); Serial.print("yVal: "); Serial.print(y); Serial.print(", "); Serial.print(z); Serial.print(", "); Serial.println(tool);
         MoveToPosCoreXY(x, y);
       } else if (type == 2) { // Тип работы по ячейкам
-        if (value1 != "") row = constrain(value1.toInt(), 0, 4); // Считываем номер строки и ограничиваем
-        if (value2 != "") col = constrain(value2.toInt(), 0, 4); // Считываем номер столбца и ограничиваем
-        Serial.print("row: "); Serial.print(row); Serial.print(", "); Serial.print("col: "); Serial.println(col);
+        Serial.print("row: "); Serial.print(row); Serial.print(", "); Serial.print("col: "); Serial.print(col); Serial.print(", "); Serial.print(z); Serial.print(", "); Serial.println(tool);
         Serial.print("cellsPosX: "); Serial.print(cellsPosX[row]); Serial.print(", "); Serial.print("cellsPosY: "); Serial.println(cellsPosY[col]);
         MoveToPosCoreXY(cellsPosX[col], cellsPosY[row]);
       }
-      /*
-      // Управляем Z
-      if (value3 == "zu") ControlZ(SERVO_Z_UP, 500); // Если команда zu
-      else if (value3 == "zd") ControlZ(SERVO_Z_DOWN, 500); // Если команда zd
-      else if (value3 != "") { // Если не пустота, то выставляем позицию
-        z = constrain(value3.toInt(), 0, 270);
-        ControlZ(z, 1000);
-      }
-      // Управляем Tool
-      if (value4 == "tu") ControlTool(SERVO_TOOL_UP, 500); // Если команда tu
-      else if (value4 == "td") ControlTool(SERVO_TOOL_DOWN, 500); // Если команда td
-      else if (value3 != "") { // Если не пустота, то выставляем позицию
-        tool = constrain(value4.toInt(), 0, 270);
-        ControlTool(tool, 1000);
-      }
-      */
+      ControlZ(z, 1000); // Управляем Z
+      ControlTool(tool, 1000); // Управляем Tool
     }
   }
 }
