@@ -29,7 +29,6 @@
 
 #define LIMIT_SWITCH_X_START_PORT PORT_3 // Порт концевика по X
 #define LIMIT_SWITCH_X_START_SLOT SLOT_1 // Слот концевика по X
-
 #define LIMIT_SWITCH_Y_START_PORT PORT_3 // Порт концевика по Y
 #define LIMIT_SWITCH_Y_START_SLOT SLOT_2 // Слот концевика по Y
 
@@ -84,7 +83,6 @@
 
 #define SERVO_Z_UP 45 // Значение, когда Z поднято
 #define SERVO_Z_DOWN 160 // Значение, когда Z опущено
-
 #define SERVO_TOOL_UP 130 // Инструмент поднят
 #define SERVO_TOOL_DOWN 20 // Инструмент выпущен
 
@@ -119,7 +117,7 @@ int boxCompletateSolve[3][3] = {
 const int cellsPosX[XY_CELLS_ARR_LEN] = {3, 36, 70, 100, 135}; // Координаты рядов ячеек
 const int cellsPosY[XY_CELLS_ARR_LEN] = {135, 103, 72, 38, 8}; // Координаты строк ячеек
 
-// Координаты хранилищ в камере
+// Координаты хранилищ в камере по X, Y
 const int storagesCellsCamPosX[XY_CELLS_ARR_LEN] = {70, 104, 139, 175, 209};
 const int storagesCellsCamPosY[XY_CELLS_ARR_LEN] = {23, 56, 92, 128, 162};
 
@@ -129,6 +127,7 @@ void setup() {
   Serial.begin(115200);
   Serial.setTimeout(5);
   Serial.println();
+  //buzzerOff(); // Выключить пьезопищалку, работает по i2c?
   stepperX.setMaxSpeed(STEPPERS_MAX_SPEED); stepperY.setMaxSpeed(STEPPERS_MAX_SPEED); // Установка максимальной скорости (оборотов в минуту). При движении шаговый двигатель будет ускоряться до этой максимальной скорости и замедляться при подходе к концу движения
   stepperX.setAcceleration(STEPPERS_ACCEL); stepperY.setAcceleration(STEPPERS_ACCEL); // Установка ускорения, в шагах в секунду за секунду
   stepperX.setEnablePin(STEPPER_X_DRV_SLP_PIN); stepperY.setEnablePin(STEPPER_Y_DRV_SLP_PIN); // Подключить пины включения/выключения шаговых двигателей
