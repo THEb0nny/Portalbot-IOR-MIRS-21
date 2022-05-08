@@ -85,7 +85,7 @@
 #define SERVO_Z_UP 45 // Значение, когда Z поднято
 #define SERVO_Z_DOWN 160 // Значение, когда Z опущено
 
-#define SERVO_TOOL_UP 140 // Инструмент поднят
+#define SERVO_TOOL_UP 130 // Инструмент поднят
 #define SERVO_TOOL_DOWN 20 // Инструмент выпущен
 
 // Концевики
@@ -140,7 +140,7 @@ void setup() {
 }
 
 void loop() {
-  //SearchStartPos(); // Вернуться на базу и установить нулевую позицию
+  SearchStartPos(); // Вернуться на базу и установить нулевую позицию
   ManualControl(2); // Ручное управление
   /*
   MoveToPosCoreXY(cellsPosX[0], cellsPosY[0]); // Чтобы не сбить столбик из жёлтых фигур перемещаемся не сразу по диагонали
@@ -401,7 +401,9 @@ int* IK_CoreXY(float x, float y) {
 // Управление из Serial
 void ManualControl(int type) {
   int x = 0, y = 0, row = -1, col = - 1, z, tool;
-  while (true) {
+  int oldX = x, oldY = y, oldRow = row, oldCol = col, oldZ = z, oldTool = tool;
+  bool control = true;
+  while (control) {
     String inputValues[MAX_INPUT_VAL_IN_MANUAL_CONTROL]; // Массив входящей строки
     String key[MAX_INPUT_VAL_IN_MANUAL_CONTROL]; // Массив ключей
     int values[MAX_INPUT_VAL_IN_MANUAL_CONTROL]; // Массив значений
@@ -414,9 +416,11 @@ void ManualControl(int type) {
       for (byte i = 0; i < MAX_INPUT_VAL_IN_MANUAL_CONTROL; i++) {
         inputValues[i] = (i == 0 ? String(strtok(strBuffer, " ")) : String(strtok(NULL, " ")));
         inputValues[i].replace(" ", ""); // Убрать возможные пробелы между символами
+        /*
         Serial.print(inputValues[i]? inputValues[i] : "null");
         if (i < MAX_INPUT_VAL_IN_MANUAL_CONTROL - 1) Serial.print(", ");
         else Serial.println();
+        */
       }
       for (byte i = 0; i < MAX_INPUT_VAL_IN_MANUAL_CONTROL; i++) {
         String inputValue = inputValues[i];
@@ -427,13 +431,13 @@ void ManualControl(int type) {
         }
         key[i] = inputValue.substring(0, strIndex);
         values[i] = (inputValue.substring(strIndex, inputValue.length())).toInt();
-        if (key[i] == "x") {
+        if (key[i] == "x" && type == 1) {
           if (x != values[i]) x = constrain(values[i], 0, MAX_X_DIST_MM); // Записываем X и ограничиваем её
-        } else if (key[i] == "y") {
+        } else if (key[i] == "y" && type == 1) {
           if (y != values[i]) y = constrain(values[i], 0, MAX_Y_DIST_MM); // Записываем Y и ограничиваем её
-        } else if (key[i] == "r") {
+        } else if (key[i] == "r" && type == 2) {
           if (row != values[i]) row = constrain(values[i], 0, 4); // Считываем номер строки и ограничиваем 
-        } else if (key[i] == "c") {
+        } else if (key[i] == "c" && type == 2) {
           if (col != values[i]) col = constrain(values[i], 0, 4); // Считываем номер столбца и ограничиваем
         } else if (key[i] == "zu") {
           z = SERVO_Z_UP;
@@ -447,21 +451,39 @@ void ManualControl(int type) {
           tool = SERVO_TOOL_DOWN;
         } else if (key[i] == "t") {
           if (tool != values[i]) tool = constrain(tool, 0, 270); // Записываем t и ограничиваем её
+        } else if (key[i] == "break") {
+          Serial.println(key[i]);
+          control = false;
+          break;
         }
         if (key[i].length() > 0) {
           Serial.print(key[i]); Serial.print(" = "); Serial.println(values[i]); // Печать ключ и значение, если ключ существует
         }
       }
       if (type == 1) { // Тип работы по координатам X и Y
-        Serial.print("xVal: "); Serial.print(x); Serial.print(", "); Serial.print("yVal: "); Serial.print(y); Serial.print(", "); Serial.print(z); Serial.print(", "); Serial.println(tool);
-        MoveToPosCoreXY(x, y);
+        if (x != oldX || y != oldY) { // Если какое-то из значений x или y обновилось
+          MoveToPosCoreXY(x, y);
+          oldX = x; oldY = y;
+          Serial.print("xVal: "); Serial.print(x); Serial.print(", "); Serial.print("yVal: "); Serial.println(y);
+        }
       } else if (type == 2) { // Тип работы по ячейкам
-        Serial.print("row: "); Serial.print(row); Serial.print(", "); Serial.print("col: "); Serial.print(col); Serial.print(", "); Serial.print(z); Serial.print(", "); Serial.println(tool);
-        Serial.print("cellsPosX: "); Serial.print(cellsPosX[row]); Serial.print(", "); Serial.print("cellsPosY: "); Serial.println(cellsPosY[col]);
-        MoveToPosCoreXY(cellsPosX[col], cellsPosY[row]);
+        if (col != oldCol || row != oldRow) { // Если какое-то из значений col или row обновилось
+          MoveToPosCoreXY(cellsPosX[col], cellsPosY[row]);
+          oldCol = col; oldRow = row;
+          Serial.print("row: "); Serial.print(row); Serial.print(", "); Serial.print("col: "); Serial.println(col);
+          Serial.print("cellsPosX: "); Serial.print(cellsPosX[row]); Serial.print(", "); Serial.print("cellsPosY: "); Serial.println(cellsPosY[col]);
+        }
       }
-      ControlZ(z, 1000); // Управляем Z
-      ControlTool(tool, 1000); // Управляем Tool
+      if (z != oldZ) { // Если новое значение z отличается
+        ControlZ(z, 1000); // Управляем Z
+        oldZ = z;
+        Serial.print(z); Serial.print(", "); Serial.println(tool);
+      }
+      if (tool != oldTool) { // Если новое значение tool отличается
+        ControlTool(tool, 1000); // Управляем Tool
+        oldTool = tool;
+        Serial.print(z); Serial.print(", "); Serial.println(tool);
+      }
     }
   }
 }
