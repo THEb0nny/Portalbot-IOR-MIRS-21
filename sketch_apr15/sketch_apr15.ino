@@ -406,11 +406,14 @@ void ManualControl(int type) {
     String inputValues[MAX_INPUT_VAL_IN_MANUAL_CONTROL]; // Массив входящей строки
     String key[MAX_INPUT_VAL_IN_MANUAL_CONTROL]; // Массив ключей
     int values[MAX_INPUT_VAL_IN_MANUAL_CONTROL]; // Массив значений
-    String inputStr = Serial.readStringUntil('\n'); // Считываем из Serial строку до символа переноса на новую строку
-    inputStr.trim(); // Чистим символы
-    if (inputStr.length() > 0) { // Если есть доступные данные
-      char strBuffer[99]; // Создаём пустой массив символов
-      inputStr.toCharArray(strBuffer, 99); // Перевести строку в массив символов
+    if (Serial.available() > 2) { // Если есть доступные данные
+      // Встроенная функция readStringUntil будет читать все данные, пришедшие в UART до специального символа — '\n' (перенос строки).
+      // Он появляется в паре с '\r' (возврат каретки) при передаче данных функцией Serial.println().
+      // Эти символы удобно передавать для разделения команд, но не очень удобно обрабатывать. Удаляем их функцией trim().
+      String inputStr = Serial.readStringUntil('\n');
+      inputStr.trim(); // Чистим символы
+      char strBuffer[32]; // Создаём пустой массив символов
+      inputStr.toCharArray(strBuffer, 32); // Перевести строку в массив символов
       // Считываем x и y разделённых пробелом, а также Z и инструментом
       for (byte i = 0; i < MAX_INPUT_VAL_IN_MANUAL_CONTROL; i++) {
         inputValues[i] = (i == 0 ? String(strtok(strBuffer, " ")) : String(strtok(NULL, " ")));
@@ -425,11 +428,11 @@ void ManualControl(int type) {
         String inputValue = inputValues[i];
         byte strIndex = inputValue.length(); // Переменая для хронения индекса вхождения цифры в входной строке, изначально равна размеру строки
         for (byte i = 0; i < 10; i++) { // Поиск первого вхождения цифры от 0 по 9 в подстроку
-          byte index = inputValue.indexOf(String(i));
-          if (index < strIndex && index != 255) strIndex = index;
+          byte index = inputValue.indexOf(String(i)); // Узнаём индекс, где нашли цифру параметра цикла
+          if (index < strIndex && index != 255) strIndex = index; // Если индекс цифры меньше strIndex, то обновляем strIndex 
         }
-        key[i] = inputValue.substring(0, strIndex);
-        values[i] = (inputValue.substring(strIndex, inputValue.length())).toInt();
+        key[i] = inputValue.substring(0, strIndex); = // Записываем ключ с начала строки до первой цицры
+        values[i] = (inputValue.substring(strIndex, inputValue.length())).toInt(); // Записываем значение с начала цифры до конца строки
         if (key[i] == "x" && type == 1) {
           if (x != values[i]) x = constrain(values[i], 0, MAX_X_DIST_MM); // Записываем X и ограничиваем её
         } else if (key[i] == "y" && type == 1) {
