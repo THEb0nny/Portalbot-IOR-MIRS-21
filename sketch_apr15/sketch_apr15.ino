@@ -130,7 +130,7 @@ void setup() {
   //buzzerOff(); // Выключить пьезопищалку, работает по i2c?
   stepperX.setMaxSpeed(STEPPERS_MAX_SPEED); stepperY.setMaxSpeed(STEPPERS_MAX_SPEED); // Установка максимальной скорости (оборотов в минуту). При движении шаговый двигатель будет ускоряться до этой максимальной скорости и замедляться при подходе к концу движения
   stepperX.setAcceleration(STEPPERS_ACCEL); stepperY.setAcceleration(STEPPERS_ACCEL); // Установка ускорения, в шагах в секунду за секунду
-  stepperX.setEnablePin(STEPPER_X_DRV_SLP_PIN); stepperY.setEnablePin(STEPPER_Y_DRV_SLP_PIN); // Подключить пины включения/выключения шаговых двигателей
+  //stepperX.setEnablePin(STEPPER_X_DRV_SLP_PIN); stepperY.setEnablePin(STEPPER_Y_DRV_SLP_PIN); // Подключить пины включения/выключения шаговых двигателей
   servoZ.attach(SERVO_Z_PIN); // Подключаем серво Z
   servoTool.attach(SERVO_TOOL_PIN); // Подключаем серво инструмента
   ControlZ(SERVO_Z_UP, 0); // Поднимаем Z
@@ -431,7 +431,7 @@ void ManualControl(int type) {
           byte index = inputValue.indexOf(String(i)); // Узнаём индекс, где нашли цифру параметра цикла
           if (index < strIndex && index != 255) strIndex = index; // Если индекс цифры меньше strIndex, то обновляем strIndex 
         }
-        key[i] = inputValue.substring(0, strIndex); = // Записываем ключ с начала строки до первой цицры
+        key[i] = inputValue.substring(0, strIndex); // Записываем ключ с начала строки до первой цицры
         values[i] = (inputValue.substring(strIndex, inputValue.length())).toInt(); // Записываем значение с начала цифры до конца строки
         if (key[i] == "x" && type == 1) {
           if (x != values[i]) x = constrain(values[i], 0, MAX_X_DIST_MM); // Записываем X и ограничиваем её
