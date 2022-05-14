@@ -44,8 +44,8 @@
 #define STEPPER_Y_DIR_PIN mePort[PORT_2].s1
 #define STEPPER_Y_STP_PIN mePort[PORT_2].s2
 
-#define STEPPER_X_DRV_SLP_PIN 9 // Пин, который включает/выключает шаговый двигатель
-#define STEPPER_Y_DRV_SLP_PIN 10 // Пин, который включает/выключает шаговый двигатель
+#define STEPPER_X_DRV_SLP_PIN mePort[PORT_4].s1 // Пин, который включает/выключает шаговый двигатель
+#define STEPPER_Y_DRV_SLP_PIN mePort[PORT_4].s2 // Пин, который включает/выключает шаговый двигатель
 #define STEPPERS_MAX_SPEED 2000 // Максимальная скорость шагового двигателя
 #define STEPPERS_ACCEL 15000 // Ускорение шагового двигателя
 #define STEP_TO_ROTATION 400 // Шагов за оборот - 360 градусов
@@ -130,7 +130,7 @@ void setup() {
   //buzzerOff(); // Выключить пьезопищалку, работает по i2c?
   stepperX.setMaxSpeed(STEPPERS_MAX_SPEED); stepperY.setMaxSpeed(STEPPERS_MAX_SPEED); // Установка максимальной скорости (оборотов в минуту). При движении шаговый двигатель будет ускоряться до этой максимальной скорости и замедляться при подходе к концу движения
   stepperX.setAcceleration(STEPPERS_ACCEL); stepperY.setAcceleration(STEPPERS_ACCEL); // Установка ускорения, в шагах в секунду за секунду
-  //stepperX.setEnablePin(STEPPER_X_DRV_SLP_PIN); stepperY.setEnablePin(STEPPER_Y_DRV_SLP_PIN); // Подключить пины включения/выключения шаговых двигателей
+  stepperX.setEnablePin(STEPPER_X_DRV_SLP_PIN); stepperY.setEnablePin(STEPPER_Y_DRV_SLP_PIN); // Подключить пины включения/выключения шаговых двигателей
   servoZ.attach(SERVO_Z_PIN); // Подключаем серво Z
   servoTool.attach(SERVO_TOOL_PIN); // Подключаем серво инструмента
   ControlZ(SERVO_Z_UP, 0); // Поднимаем Z
@@ -344,6 +344,8 @@ void SearchStartPos() {
     }
   } while (!xStartlimitSwitch.touched() && !yStartlimitSwitch.touched()); // Пока 2 концевика не сработали
   stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0); // Установить позиции 0, 0
+  stepperX.stop(); stepperY.stop(); // Остановить моторы
+  stepperX.disableOutputs(); stepperY.disableOutputs();
   Serial.println("x, y = 0, 0");
 }
 
@@ -363,12 +365,13 @@ void ControlTool(short pos, int delayTime) {
 void MoveToPosCoreXY(int x, int y) {
   int* motPos = new int[2];
   motPos = IK_CoreXY(x, y); // Считаем обратную кинематику
+  stepperX.enableOutputs(); stepperY.enableOutputs();
   while (true) { // Перемещаем моторы в позицию
     stepperX.moveTo(motPos[0]); stepperY.moveTo(motPos[1]);
     stepperX.run(); stepperY.run();
     if (!stepperX.isRunning() && !stepperY.isRunning()) break; // Мотор остановился выполнив перемещение
   }
-  //stepperX.stop(); stepperY.stop(); // Остановить моторы
+  stepperX.stop(); stepperY.stop(); // Остановить моторы
   stepperX.disableOutputs(); stepperY.disableOutputs();
   if (xStartlimitSwitch.touched() && yStartlimitSwitch.touched()) { // Сработали концевики, значит мы на нулевой позии
     stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0); // Обнулить
@@ -453,6 +456,8 @@ void ManualControl(int type) {
           tool = SERVO_TOOL_DOWN;
         } else if (key[i] == "t") {
           if (tool != values[i]) tool = constrain(tool, 0, 270); // Записываем t и ограничиваем её
+        } else if (key[i] == "base") { // Двигаться в 0 позицию
+          SearchStartPos();
         } else if (key[i] == "break") {
           Serial.println(key[i]);
           control = false;
