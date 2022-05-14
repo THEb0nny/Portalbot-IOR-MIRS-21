@@ -43,14 +43,13 @@
 #define STEPPER_X_STP_PIN mePort[PORT_1].s2
 #define STEPPER_Y_DIR_PIN mePort[PORT_2].s1
 #define STEPPER_Y_STP_PIN mePort[PORT_2].s2
-
 #define STEPPER_X_DRV_SLP_PIN mePort[PORT_4].s1 // Пин, который включает/выключает шаговый двигатель
 #define STEPPER_Y_DRV_SLP_PIN mePort[PORT_4].s2 // Пин, который включает/выключает шаговый двигатель
+
 #define STEPPERS_MAX_SPEED 2000 // Максимальная скорость шагового двигателя
 #define STEPPERS_ACCEL 15000 // Ускорение шагового двигателя
 #define STEP_TO_ROTATION 400 // Шагов за оборот - 360 градусов
-#define DIST_MM_PER_STEP_X 0.04 // Дистанция в мм за прохождение 1 шага мотора X
-#define DIST_MM_PER_STEP_Y 0.04 // Дистанция в мм за прохождение 1 шага мотора X
+#define DIST_MM_PER_STEP 0.04 // Дистанция в мм за прохождение 1 шага
 
 // Номера фигур по настройкам камеры
 #define R_BALL_TYPE 0
@@ -131,6 +130,7 @@ void setup() {
   stepperX.setMaxSpeed(STEPPERS_MAX_SPEED); stepperY.setMaxSpeed(STEPPERS_MAX_SPEED); // Установка максимальной скорости (оборотов в минуту). При движении шаговый двигатель будет ускоряться до этой максимальной скорости и замедляться при подходе к концу движения
   stepperX.setAcceleration(STEPPERS_ACCEL); stepperY.setAcceleration(STEPPERS_ACCEL); // Установка ускорения, в шагах в секунду за секунду
   stepperX.setEnablePin(STEPPER_X_DRV_SLP_PIN); stepperY.setEnablePin(STEPPER_Y_DRV_SLP_PIN); // Подключить пины включения/выключения шаговых двигателей
+  stepperX.disableOutputs(); stepperY.disableOutputs(); // Выключить при старте управление драйверами моторов
   servoZ.attach(SERVO_Z_PIN); // Подключаем серво Z
   servoTool.attach(SERVO_TOOL_PIN); // Подключаем серво инструмента
   ControlZ(SERVO_Z_UP, 0); // Поднимаем Z
@@ -333,6 +333,7 @@ void SetBoxCompletate() {
 
 // Возвращение на домашнюю позициию
 void SearchStartPos() {
+  stepperX.enableOutputs(); stepperY.enableOutputs(); // Включить управление драйвером моторов
   do {
     stepperX.setSpeed(STEPPERS_MAX_SPEED); stepperY.setSpeed(-STEPPERS_MAX_SPEED); // Установить скорости, а почему только тут?
     while (!yStartlimitSwitch.touched()) { // По x сместиться в крайнюю позицию
@@ -345,7 +346,7 @@ void SearchStartPos() {
   } while (!xStartlimitSwitch.touched() && !yStartlimitSwitch.touched()); // Пока 2 концевика не сработали
   stepperX.setCurrentPosition(0); stepperY.setCurrentPosition(0); // Установить позиции 0, 0
   stepperX.stop(); stepperY.stop(); // Остановить моторы
-  stepperX.disableOutputs(); stepperY.disableOutputs();
+  stepperX.disableOutputs(); stepperY.disableOutputs(); // Выключить управление драйвером моторов
   Serial.println("x, y = 0, 0");
 }
 
@@ -380,8 +381,8 @@ void MoveToPosCoreXY(int x, int y) {
 
 // Прямая задача кинематики для CoreXY
 int* FK_CoreXY(float lx, float ly) { // void FK_CoreXY(long l1, long l2, float &x, float &y)
-  lx *= DIST_MM_PER_STEP_X;
-  ly *= DIST_MM_PER_STEP_Y;
+  lx *= DIST_MM_PER_STEP;
+  ly *= DIST_MM_PER_STEP;
   x = (float)(lx + ly) / 2.0;
   y = x - (float)ly;
   int *return_array = new int[2];
@@ -392,8 +393,8 @@ int* FK_CoreXY(float lx, float ly) { // void FK_CoreXY(long l1, long l2, float &
 
 // Обратная задача кинематики для CoreXY
 int* IK_CoreXY(float x, float y) {
-  lx = floor((x + y) / DIST_MM_PER_STEP_X) * -1;
-  ly = floor((x - y) / DIST_MM_PER_STEP_Y) * -1;
+  lx = floor((x + y) / DIST_MM_PER_STEP) * -1;
+  ly = floor((x - y) / DIST_MM_PER_STEP) * -1;
   int *return_array = new int[2];
   return_array[0] = lx;
   return_array[1] = ly;
@@ -402,7 +403,7 @@ int* IK_CoreXY(float x, float y) {
 
 // Управление из Serial
 void ManualControl(int type) {
-  int x = 0, y = 0, row = -1, col = - 1, z, tool;
+  int x = 0, y = 0, row = -1, col = -1, z = SERVO_Z_UP, tool = SERVO_TOOL_UP;
   int oldX = x, oldY = y, oldRow = row, oldCol = col, oldZ = z, oldTool = tool;
   bool control = true;
   while (control) {
