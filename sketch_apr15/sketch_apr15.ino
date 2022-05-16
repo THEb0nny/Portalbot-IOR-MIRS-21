@@ -25,6 +25,7 @@
 #include "TrackingCamI2C.h" // Обрезанная версия, чтобы хватало динамической памяти
 #include "GyverTimer.h"
 
+#define DEBUG_LEVEL 2 // Уровень логов
 #define MAX_INPUT_VAL_IN_MANUAL_CONTROL 4 // Максимальное количество значений в строку монитора порта при ручном управлении
 
 #define LIMIT_SWITCH_X_START_PORT PORT_3 // Порт концевика по X
@@ -416,27 +417,27 @@ void ManualControl(int type) {
       // Эти символы удобно передавать для разделения команд, но не очень удобно обрабатывать. Удаляем их функцией trim().
       String inputStr = Serial.readStringUntil('\n');
       inputStr.trim(); // Чистим символы
-      char strBuffer[32]; // Создаём пустой массив символов
-      inputStr.toCharArray(strBuffer, 32); // Перевести строку в массив символов
+      char strBuffer[99]; // Создаём пустой массив символов
+      inputStr.toCharArray(strBuffer, 99); // Перевести строку в массив символов
       // Считываем x и y разделённых пробелом, а также Z и инструментом
       for (byte i = 0; i < MAX_INPUT_VAL_IN_MANUAL_CONTROL; i++) {
         inputValues[i] = (i == 0 ? String(strtok(strBuffer, " ")) : String(strtok(NULL, " ")));
         inputValues[i].replace(" ", ""); // Убрать возможные пробелы между символами
-        /*
-        Serial.print(inputValues[i]? inputValues[i] : "null");
-        if (i < MAX_INPUT_VAL_IN_MANUAL_CONTROL - 1) Serial.print(", ");
-        else Serial.println();
-        */
+        if (DEBUG_LEVEL >= 2) {
+          if (inputValues[i] != "") {
+            if (i > 0) Serial.print(", ");
+            Serial.print(inputValues[i]);
+          }
+          if (i == MAX_INPUT_VAL_IN_MANUAL_CONTROL - 1) Serial.println();
+        }
       }
       for (byte i = 0; i < MAX_INPUT_VAL_IN_MANUAL_CONTROL; i++) {
-        String inputValue = inputValues[i];
-        byte strIndex = inputValue.length(); // Переменая для хронения индекса вхождения цифры в входной строке, изначально равна размеру строки
-        for (byte i = 0; i < 10; i++) { // Поиск первого вхождения цифры от 0 по 9 в подстроку
-          byte index = inputValue.indexOf(String(i)); // Узнаём индекс, где нашли цифру параметра цикла
-          if (index < strIndex && index != 255) strIndex = index; // Если индекс цифры меньше strIndex, то обновляем strIndex 
-        }
-        key[i] = inputValue.substring(0, strIndex); // Записываем ключ с начала строки до первой цицры
-        values[i] = (inputValue.substring(strIndex, inputValue.length())).toInt(); // Записываем значение с начала цифры до конца строки
+        if (inputValues[i] == "") continue; // Если значение пустое, то перейти на следующий шаг цикла
+        String inputValue = inputValues[i]; // Записываем в строку обрезанную часть пробелами
+        byte separatorIndexTmp = inputValue.indexOf("="); // Значение, где мы нашли позицию знака равенства
+        byte separatorIndex = (separatorIndexTmp != 255 ? separatorIndexTmp : inputValue.length()); // Окончательная позиция для разделения
+        key[i] = inputValue.substring(0, separatorIndex); // Записываем ключ с начала строки до знака равно
+        values[i] = (inputValue.substring(separatorIndex + 1, inputValue.length())).toInt(); // Записываем значение с начала цифры до конца строки
         if (key[i] == "x" && type == 1) {
           if (x != values[i]) x = constrain(values[i], 0, MAX_X_DIST_MM); // Записываем X и ограничиваем её
         } else if (key[i] == "y" && type == 1) {
